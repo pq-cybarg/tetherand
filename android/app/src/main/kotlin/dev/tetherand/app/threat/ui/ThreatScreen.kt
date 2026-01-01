@@ -72,6 +72,10 @@ fun ThreatScreen() {
         // user-action checklist sits above the kill-switch.
         dev.tetherand.app.hardened.ui.HardenedSection()
         dev.tetherand.app.hardened.ui.IncidentResponseCard()
+        // M7b SDR availability.
+        dev.tetherand.app.threat.sdr.SdrSection()
+        // M7c Root-tier MTK modem readers (dormant on stock).
+        dev.tetherand.app.threat.root.RootSection()
 
         PanicButton()
 
