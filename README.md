@@ -11,7 +11,8 @@ and `docs/superpowers/plans/` for per-milestone implementation plans.
 - **M1** (Tether MVP — Apache-2.0 forked relay + custom-branded APK): **shipped**.
 - **M3** (Privacy Chain core + WireGuard hop via BoringTun JNI): **shipped**.
 - **M4** (Mullvad full stack: classic WG + PQ tunnel ML-KEM-1024 + kill-switch + multihop + DAITA + obfuscation transports + split-tunnel): **shipped**.
-- **M2, M5-M10**: planned. See spec.
+- **M7a** (Threat Detection MVP — 8 heuristics, Room-backed alerts + per-geohash6 baseline, Compose Threat tab, panic button): **shipped**. APK is now GPLv3-converged.
+- **M2, M5, M6, M7b, M7c, M8-M10**: planned. See spec.
 
 ## Build
 

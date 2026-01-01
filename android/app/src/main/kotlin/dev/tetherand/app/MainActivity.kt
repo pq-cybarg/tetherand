@@ -30,6 +30,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // M7a: kick the threat-detection foreground service. Idempotent —
+        // Android handles "already running" by routing to onStartCommand
+        // with a fresh START intent. The service decides whether to no-op.
+        try {
+            startForegroundService(
+                Intent(this, dev.tetherand.app.threat.service.ThreatDetectionService::class.java)
+            )
+        } catch (_: Throwable) {
+            // Foreground service may be rejected if the user hasn't granted
+            // POST_NOTIFICATIONS on first launch. The Threat tab still works
+            // (Room flow), just without live collection until permission lands.
+        }
         setContent {
             TetherandTheme {
                 TabbedRoot(
