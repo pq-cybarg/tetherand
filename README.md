@@ -10,7 +10,8 @@ and `docs/superpowers/plans/` for per-milestone implementation plans.
 - **M0** (DEFCON pre-flight playbook + scripts): **shipped**. Run `./tutorial.sh` → http://localhost:7331/.
 - **M1** (Tether MVP — Apache-2.0 forked relay + custom-branded APK): **shipped**.
 - **M3** (Privacy Chain core + WireGuard hop via BoringTun JNI): **shipped**.
-- **M2, M4-M10**: planned. See spec.
+- **M4a-c** (Mullvad classic WG + PQ tunnel ML-KEM-1024 + kill-switch): **shipped**.
+- **M2, M4d-g, M5-M10**: planned. See spec.
 
 ## Build
 
