@@ -1,0 +1,14 @@
+/upstream/
+/dist/
+/bin/*
+!/bin/.gitkeep
+/target/
+/keys/*
+!/keys/.gitkeep
+*.apk.idsig
+.DS_Store
+local.properties
+.gradle/
+build/
+.idea/
+*.iml
