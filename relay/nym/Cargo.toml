@@ -1,0 +1,36 @@
+[package]
+name = "tetherand-nym"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Nym SDK: high-level mixnet client (Sphinx + cover traffic) exposing a
+# tokio-async surface. We use the WebSocket / TCP variants for the
+# entry-mixnode connection; native QUIC ships in nym-sdk 1.6+.
+#
+# The `mixnet` feature pulls in the network client; we leave the
+# `vpn` feature off because that requires the Linux/macOS Wireguard
+# kernel module which doesn't apply on Android (we already have our
+# own WG hop via M4).
+# Nym SDK is gated behind `with-sdk` because nym-sdk 1.4's transitive
+# nym-noise 1.20.4 currently fails to type-infer under rustc 1.83+
+# (a closure parameter the upstream forgot to annotate). The Tetherand
+# JNI surface compiles standalone without it; build-nym-android.sh
+# pins a working nightly + flips this feature on at cross-compile time.
+nym-sdk = { version = "1.4", default-features = false, optional = true }
+
+tokio = { version = "1.43", features = ["rt-multi-thread", "macros", "net", "sync", "io-util"] }
+log = "0.4"
+android_logger = { version = "0.14", optional = true }
+jni = "0.21"
+once_cell = "1.20"
+thiserror = "2.0"
+serde = { version = "1", features = ["derive"] }
+hex = "0.4"
+
+[features]
+android = ["dep:android_logger"]
+with-sdk = ["dep:nym-sdk"]

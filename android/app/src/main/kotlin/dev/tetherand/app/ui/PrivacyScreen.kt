@@ -75,6 +75,14 @@ fun PrivacyScreen(onStart: (String, Boolean) -> Unit, onStop: () -> Unit) {
     var torVanguards by remember { mutableStateOf(initialTor.vanguards) }
     var torPreferPq by remember { mutableStateOf(initialTor.preferPqHandshake) }
     var torStatus by remember { mutableStateOf<String?>(null) }
+    // M5 Nym hop config — mnemonic + entry/exit gateways.
+    val nymStore = remember { dev.tetherand.app.nym.NymCredentials(ctx) }
+    val initialNym = remember { nymStore.load() }
+    var nymEnabled by remember { mutableStateOf(false) }
+    var nymMnemonic by remember { mutableStateOf(initialNym.mnemonic) }
+    var nymEntry by remember { mutableStateOf(initialNym.entryGateway) }
+    var nymExit by remember { mutableStateOf(initialNym.exitGateway) }
+    var nymStatus by remember { mutableStateOf<String?>(null) }
     val scroll = rememberScrollState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -366,6 +374,50 @@ fun PrivacyScreen(onStart: (String, Boolean) -> Unit, onStop: () -> Unit) {
                 }) { Text("Save Tor config", fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
                 if (torStatus != null) {
                     Text(torStatus!!, fontFamily = FontFamily.Monospace, fontSize = 10.sp,
+                         color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        // M5 Nym hop card.
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("NymVPN (mixnet)", fontWeight = FontWeight.SemiBold,
+                         color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                    Spacer(Modifier.weight(1f))
+                    Switch(checked = nymEnabled, onCheckedChange = { nymEnabled = it })
+                }
+                Text("Sphinx-format 3-hop mixnet between entry + exit gateways. Breaks the address-association that VPN-only hops can't.",
+                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontSize = 11.sp)
+                OutlinedTextField(
+                    value = nymMnemonic, onValueChange = { nymMnemonic = it },
+                    label = { Text("zk-nym mnemonic (paid bandwidth)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 10.sp),
+                )
+                OutlinedTextField(
+                    value = nymEntry, onValueChange = { nymEntry = it },
+                    label = { Text("Entry gateway id (optional)") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 10.sp),
+                )
+                OutlinedTextField(
+                    value = nymExit, onValueChange = { nymExit = it },
+                    label = { Text("Exit gateway id (optional)") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 10.sp),
+                )
+                Button(modifier = Modifier.fillMaxWidth(), onClick = {
+                    nymStore.save(dev.tetherand.app.nym.NymConfig(
+                        mnemonic = nymMnemonic.trim(),
+                        entryGateway = nymEntry.trim(),
+                        exitGateway = nymExit.trim(),
+                    ))
+                    nymStatus = "Nym config saved (encrypted at rest)."
+                }) { Text("Save Nym config", fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
+                if (nymStatus != null) {
+                    Text(nymStatus!!, fontFamily = FontFamily.Monospace, fontSize = 10.sp,
                          color = MaterialTheme.colorScheme.primary)
                 }
             }

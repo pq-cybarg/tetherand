@@ -12,6 +12,7 @@ members = [
     "pt-bridge",      # M6.x: PT-spec binary implementing obfs4 + meek + webtunnel
     "transport-bt",   # M2: Bluetooth RFCOMM transport (host Mac discovers Seeker)
     "transport-aoa",  # M2: USB-AOA transport (Mac switches Seeker into accessory mode)
+    "nym",            # M5: NymVPN mixnet hop via nym-sdk + JNI for Android
 ]
 
 [workspace.package]
