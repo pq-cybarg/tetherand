@@ -216,6 +216,17 @@ Chain failure modes are user-configurable per chain: `block` (kill-switch, no tr
 
 ## Threat Detection Subsystem
 
+### Prior Art
+
+This subsystem builds on two existing GPL-3 projects whose code we can port directly:
+
+- **AIMSICD** (Android IMSI-Catcher Detector) — github.com/CellularPrivacy/Android-IMSI-Catcher-Detector. Mostly inactive since ~2017 but the canonical reference for non-root, TelephonyManager-based IMSI-catcher detection. Heuristics we port: `BTSAlgorithm` (cell-tower consistency vs. OpenCellID), LAC/CID consistency, neighbor-cell consistency, femtocell pattern, encryption-status capture where carriers expose it, silent-SMS heuristic (binary SMS arrival to phantom port). License compatible with ours (both GPL-3).
+- **SnoopSnitch** — opensource.srlabs.de/projects/snoopsnitch. The Qualcomm `/dev/diag` path does not apply to the Seeker (MediaTek), but we port: silent-paging analysis, cell-tower fingerprinting database design, RAT-downgrade severity scoring, encryption-indicator algorithm (A5/0 etc. when exposed via `cell_info` or `service_state` extras). License compatible (GPL-3).
+
+The Threat Detection runtime is therefore: **AIMSICD's TelephonyManager heuristics, modernised for Android 16 (`TelephonyCallback`, R+ APIs, scoped storage), augmented with SnoopSnitch's higher-level heuristics where they don't require Qualcomm diag**, plus our additions (Wi-Fi/BT/app-audit). Where a SnoopSnitch heuristic *does* require diag and we detect a Qualcomm device (not the Seeker, but the architecture is portable), we expose it as an opt-in feature gated on that capability.
+
+Tower database: bundle a quarterly OpenCellID snapshot in-APK (~80 MB compressed for global; ~3 MB for the user's MCC), with an in-app updater for fresh pulls. AIMSICD's `RealmHelper` schema replaced with Room + an `mcc_mnc_index` partial-load strategy so the DB lookups stay sub-millisecond on-device.
+
 ### Service
 
 `ThreatDetectionService` — foreground service, independent of `TetherandVpnService`. Survives tether on/off. Notification persistence required by Android.
@@ -236,10 +247,20 @@ Chain failure modes are user-configurable per chain: `block` (kill-switch, no tr
 
 ### Heuristics (alert ≥ threshold)
 
-- **Stingray fallback**: RAT downgrades from 5G/LTE to UMTS/GSM in an area baseline-recorded as 4G/5G covered. Confidence increases with sudden + stationary (low accel) + new cell ID.
-- **Fake BTS**: previously unseen `CID/LAC` with anomalously high signal AND zero `neighboringCellInfo` AND not on operator's published cell DB (optional offline DB).
-- **TA jump**: Timing Advance > N rings change in < 5 s without motion (Linear Accel below threshold) → suggests cell location forgery or sudden cell switch.
-- **Cell flapping**: > 4 cell-ID handovers in 60 s while stationary.
+Cellular (ported / adapted from AIMSICD + SnoopSnitch, modernised):
+
+- **Stingray fallback** (SnoopSnitch-derived): RAT downgrades from 5G/LTE to UMTS/GSM in an area baseline-recorded as 4G/5G covered. Confidence increases with sudden + stationary (low accel) + new cell ID. Severity scored on AIMSICD's `BTSAlgorithm` weights.
+- **Fake BTS** (AIMSICD `BTSAlgorithm`): cell `CID/LAC/MCC/MNC` not present in OpenCellID snapshot for the user's area, AND anomalously high signal, AND zero `neighboringCellInfo`. Tower-DB lookup is local.
+- **LAC change anomaly** (AIMSICD): LAC changes more than threshold/hour while stationary; LAC value outside known carrier LAC ranges.
+- **Femtocell pattern** (AIMSICD): CID values in vendor-known femtocell ranges, with `getCellLocation()` GPS inconsistency.
+- **Silent SMS** (SnoopSnitch-derived, best-effort): binary SMS arrivals to phantom ports detected via `SmsManager` broadcast inspection; full coverage limited by Android 12+ permissions, but stalking-grade silent SMS is still partly visible.
+- **Encryption indicator** (SnoopSnitch-derived): when carrier `service_state` extras expose cipher info, alert on A5/0 (no encryption). Some carriers expose this via `TelephonyManager` extras; many don't — flag is presented as "data available" / "not exposed by carrier".
+- **Cell fingerprint mismatch** (SnoopSnitch-derived): persistent cell IDs whose signal/neighbor fingerprint changes day-over-day.
+- **TA jump** (our addition): Timing Advance > N rings change in < 5 s without motion (Linear Accel below threshold) → suggests cell location forgery or sudden cell switch.
+- **Cell flapping** (our addition): > 4 cell-ID handovers in 60 s while stationary.
+
+Wi-Fi / Bluetooth / App-audit (our additions, not in AIMSICD or SnoopSnitch):
+
 - **Evil twin**: scan result with SSID matching a recently-connected SSID but BSSID OUI from a different vendor; bonus if RSSI suddenly very high. Detect deauth flood by counting `WifiManager.startScan()` interruptions / `EXTRA_RESULTS_UPDATED` false events.
 - **Karma attack**: probe-request response from networks the phone hasn't broadcast (requires monitor mode → skip without root; substitute: spike in unknown-SSID auto-joins).
 - **Trust store change**: new root CA installed not in last snapshot.
@@ -310,7 +331,7 @@ The userspace TCP/IP stack is forked from Gnirehtet's `relay-rust` initially. A 
 | **M4** Mullvad + PQ | Mullvad API client, account login, PQ tunnel, multihop, DAITA, obfuscation toggles, kill-switch, split-tunnel | 8-12 h | + Mullvad |
 | **M5** NymVPN | `nym-vpn-client` embedded via JNI, mnemonic login, entry/exit selection | 6-10 h | + Nym |
 | **M6** Tor + bridges + PQ | Cross-compile `tor` and PTs for arm64-android, configure as a hop, BridgeDB integration, control-port wrapper, PQ flags | 14-18 h | Full chain library |
-| **M7** Threat detection | All signal sources, heuristic engine, per-location baselining, Threat tab + alert feed + panic button | 16-20 h | Threat subsystem live |
+| **M7** Threat detection | Port AIMSICD `BTSAlgorithm` + tower DB, port SnoopSnitch high-level heuristics, modernise to Android 16 (`TelephonyCallback`, Room), Wi-Fi/BT/app-audit signal sources, per-location baselining, Threat tab + alert feed + panic button | 16-20 h | Threat subsystem live |
 | **M8** Polish & release | Smoke tests, signed release APK, install scripts, README, performance tuning | 6-8 h | Shippable |
 
 **Total: ~85-115 h of focused work.**
@@ -328,7 +349,8 @@ Parallelization opportunities within M2 (BT, AOA, TUI, LaunchAgent are largely i
 - **AOA on Solana Seeker.** USB Accessory protocol is occasionally finicky on OEM USB stacks. Mitigation: ship USB-ADB as default; mark AOA as opt-in until validated.
 - **Bluetooth throughput.** Realistic RFCOMM ceiling on Android is 1-3 Mbps; advertise this in UI so users don't expect USB speeds.
 - **Tor PQ flag stability.** Tor's PQ rollout is still in progress as of design date. Spec includes the toggle but defaults to whatever Tor's recommended stable configuration is at build time. If PQ flags are unstable, the toggle is greyed-out with a "not yet available" tooltip.
-- **MediaTek baseband visibility.** No `/dev/diag` means our threat detection is heuristic, not deterministic. We document this clearly in the Threat tab and recommend cross-checking with hardware-level tools (Crocodile Hunter, etc.) when in high-threat environments.
+- **MediaTek baseband visibility.** No Qualcomm `/dev/diag` means SnoopSnitch's diag-mode heuristics aren't directly available; we rely on AIMSICD-style `TelephonyManager` heuristics plus the higher-level subset of SnoopSnitch heuristics. We document this clearly in the Threat tab ("Detection depth: heuristic — strongest on Qualcomm devices") and recommend cross-checking with hardware-level tools (Crocodile Hunter, etc.) when in high-threat environments.
+- **AIMSICD/SnoopSnitch staleness.** Both projects target older Android versions and APIs (`PhoneStateListener` instead of `TelephonyCallback`; pre-scoped-storage I/O; pre-permission-revamp). Porting is a partial rewrite, not a copy-paste; we keep the algorithms and rewrite the plumbing for Android 16. Each ported heuristic gets a unit test against canned signal fixtures so we know the algorithm survived the port.
 - **Mullvad / Nym API changes.** Both vendors version their public APIs; we pin and add CI canaries that exercise the documented endpoints monthly.
 - **Single-VPN constraint on Android.** Android only allows one active `VpnService`; we are that one. Conflicting apps (e.g. Mullvad's own app, Mullvad already installed on the user's Seeker) are detected on pre-flight and the UI guides the user to disable them.
 - **License pollution.** GPL-3 from Gnirehtet propagates to the relay core. Acceptable for v1; document clearly in `LICENSE` and `NOTICE`. Future relay rewrite can relicense.
