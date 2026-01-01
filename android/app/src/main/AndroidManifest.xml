@@ -102,6 +102,20 @@
                 android:value="honeypot"/>
         </service>
 
+        <!-- M10: AI Guard clipboard scrubber. Foreground because Android
+             restricts clipboard reads to foreground apps and default IMEs
+             from SDK 30+; as a foreground service we satisfy that. The
+             scrubber runs the prompt-injection regex against every clip
+             change and surfaces hits as High-severity Alerts via ThreatDb. -->
+        <service
+            android:name=".aiguard.clipboard.ClipboardScrubberService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="clipboard_scrubber"/>
+        </service>
+
         <!-- M9: Hardened Mode Quick Settings tile ("DEFCON Mode"). One-tap
              entry/exit. Must be exported with BIND_QUICK_SETTINGS_TILE so
              the system SystemUI process can bind to it. -->
