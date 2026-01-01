@@ -95,18 +95,18 @@ class BridgeRotation(
         val current = lastUsedBridge.get()
         val next = bridges.firstOrNull { it != current } ?: bridges.first()
         Log.i(TAG, "rotating to fresh bridge (${bridges.size} configured, ${redact(next)})")
-        // Stop and restart the hop. The orchestrator's pump-jobs will
-        // re-establish on the new circuit. We don't tear down the
-        // VpnService — only the hop instance.
-        try { torHop.stop() } catch (_: Throwable) {}
-        // The hop's start() takes an input Channel; the orchestrator
-        // is what owns that channel. The cleanest signal is to ask
-        // the orchestrator to reset the hop. For v0.1 the cleanest
-        // path is: log the intent, mark the new bridge as preferred
-        // for the NEXT bootstrap, and let the user re-enable the
-        // chain. The full automated-restart hook lives in M11.x
-        // once the orchestrator exposes a single-hop-reset API.
-        lastUsedBridge.set(next)
+        // In-place arti runtime swap inside TorHop — Channels and
+        // forwarder coroutines stay alive; only the underlying
+        // arti pointer changes. Stream-level retries fall back via
+        // TorFlowForwarder's TCP state machine (in-flight reads
+        // get -1 → FIN-ACK to device → device reconnects through
+        // the fresh runtime).
+        if (torHop.rotateBridge(next)) {
+            lastUsedBridge.set(next)
+            Log.i(TAG, "rotation complete")
+        } else {
+            Log.w(TAG, "rotation failed; keeping previous bridge active")
+        }
     }
 
     private fun nextInterval(): Long {

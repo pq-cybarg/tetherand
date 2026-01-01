@@ -45,8 +45,16 @@ class TorHop(
     private val _stats = MutableStateFlow(HopStats())
     override val stats: StateFlow<HopStats> = _stats.asStateFlow()
 
-    private var handle: Long = 0L
+    @Volatile private var handle: Long = 0L
     private var forwarder: TorFlowForwarder? = null
+    /** Saved native bootstrap parameters, so [rotateBridge] can
+     *  re-call `nativeInit` with a different bridges-csv on the
+     *  same cache + state dir (preserves the gateway identity). */
+    private var cacheDir: String = ""
+    private var stateDir: String = ""
+    private var ptBridgePath: String = ""
+    private var snowflakePath: String = ""
+    private var conjurePath: String = ""
 
     /** Port of the embedded SOCKS5 listener, or null until [start] returns. */
     var socksPort: Int? = null
@@ -72,11 +80,14 @@ class TorHop(
             // them; at runtime we rename to extension-less executables
             // so arti's spawn() finds the right binary.
             val ptStaged = PtBinaryStager.stage(ctx)
+            cacheDir = cache
+            stateDir = state
+            ptBridgePath = ptStaged.ptBridge.orEmpty()
+            snowflakePath = ptStaged.snowflake.orEmpty()
+            conjurePath = ptStaged.conjure.orEmpty()
             handle = nativeInit(
                 cache, state, bridgesCsv, cfg.vanguards, cfg.preferPqHandshake,
-                ptStaged.ptBridge.orEmpty(),
-                ptStaged.snowflake.orEmpty(),
-                ptStaged.conjure.orEmpty(),
+                ptBridgePath, snowflakePath, conjurePath,
             )
             if (handle == 0L) throw IllegalStateException("Arti bootstrap failed (see logcat tetherand-tor)")
             // Spawn the embedded SOCKS5 listener so apps can route via
@@ -110,16 +121,23 @@ class TorHop(
         // The forwarder reads packets from `input`, dispatches per-flow,
         // and emits return packets on `output`.
         val output = Channel<ByteArray>(64)
-        val h = handle
+        // Closures read the LIVE handle via `this.handle` on each call
+        // rather than capturing a snapshot. That lets [rotateBridge]
+        // swap the underlying arti runtime without breaking the
+        // long-running TorFlowForwarder's per-flow operations —
+        // in-flight streams from the old runtime fail with -1 (which
+        // the TCP state machine turns into a FIN-ACK back to the
+        // device; the device-side TCP stack reconnects through the
+        // fresh arti runtime).
         val fwd = TorFlowForwarder(
-            dialer = { host, port -> nativeDial(h, host, port).toLong() },
-            dialClose = { sid -> try { nativeClose(h, sid) } catch (_: Throwable) {} },
+            dialer = { host, port -> nativeDial(handle, host, port).toLong() },
+            dialClose = { sid -> try { nativeClose(handle, sid) } catch (_: Throwable) {} },
             streamRead = { sid, buf ->
-                try { nativeStreamRead(h, sid, buf) }
+                try { nativeStreamRead(handle, sid, buf) }
                 catch (_: Throwable) { -1 }
             },
             streamWrite = { sid, bytes ->
-                try { nativeStreamWrite(h, sid, bytes) }
+                try { nativeStreamWrite(handle, sid, bytes) }
                 catch (_: Throwable) { -1 }
             },
         )
@@ -144,6 +162,60 @@ class TorHop(
         socksPort = null
         dev.tetherand.app.net.TorProxyRegistry.publish(null)
         _state.value = HopState.Idle
+    }
+
+    /**
+     * Swap the underlying arti runtime onto a fresh bridge without
+     * touching the Kotlin-side data-plane Channels. Called by
+     * [BridgeRotation] on its periodic tick. Idempotent under
+     * concurrent invocation — the @Synchronized on this method
+     * serializes overlapping rotations.
+     *
+     * Sequence:
+     *   1. Shutdown the old arti handle (no longer dial-able).
+     *   2. Mark the live `handle` field as 0 so any in-flight
+     *      JNI calls bail with -1 (TCP state machine handles this
+     *      gracefully by FIN-ACKing the device).
+     *   3. Spawn a new arti runtime with [newBridgesCsv] as its
+     *      bridge configuration, re-using the cache+state dirs
+     *      so the cached consensus + descriptors are warm.
+     *   4. Re-open the SOCKS5 listener (port is republished to
+     *      [TorProxyRegistry]).
+     *   5. Update the live `handle` to the new pointer.
+     *
+     * Returns true on success, false on any failure during the
+     * swap. On failure the handle is left at 0 (hop is in
+     * Error state); caller (BridgeRotation) logs + retries on
+     * next tick.
+     */
+    @Synchronized
+    fun rotateBridge(newBridgesCsv: String): Boolean {
+        if (handle == 0L) return false
+        val oldHandle = handle
+        return try {
+            handle = 0L
+            try { nativeShutdown(oldHandle) } catch (_: Throwable) {}
+            // Retract the SOCKS port during the cutover; readers
+            // see "no proxy" and defer their next request rather
+            // than hitting a closed port.
+            socksPort = null
+            dev.tetherand.app.net.TorProxyRegistry.publish(null)
+
+            val fresh = nativeInit(
+                cacheDir, stateDir, newBridgesCsv,
+                cfg.vanguards, cfg.preferPqHandshake,
+                ptBridgePath, snowflakePath, conjurePath,
+            )
+            if (fresh == 0L) return false
+
+            val sp = nativeStartSocks(fresh)
+            socksPort = if (sp > 0) sp else null
+            dev.tetherand.app.net.TorProxyRegistry.publish(socksPort)
+            handle = fresh
+            true
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     /** Reachability probe — dials host:port through Tor. Returns true
