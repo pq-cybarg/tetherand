@@ -42,4 +42,45 @@ object MullvadConfigBuilder {
         )
         return cfg to device
     }
+
+    /**
+     * Two-hop variant: client connects to [entry], traffic exits via [exit].
+     * Uses [exit].multihopPort instead of 51820 — Mullvad's entry server
+     * forwards to the exit on that special internal port.
+     */
+    suspend fun buildMultihop(
+        api: MullvadApi,
+        accountNumber: String,
+        entry: MullvadWgServer,
+        exit: MullvadWgServer,
+    ): Pair<WireGuardConfig, MullvadDevice> {
+        require(exit.multihopPort > 0) {
+            "exit server ${exit.hostname} has no multihop_port (server may not support multihop)"
+        }
+        val login = api.login(accountNumber)
+        val kp = nativeGenerateX25519Keypair()
+        require(kp.size == 64) { "native keypair returned ${kp.size} bytes" }
+        val privKey = kp.copyOfRange(0, 32)
+        val pubKey = kp.copyOfRange(32, 64)
+        val pubB64 = Base64.encodeToString(pubKey, Base64.NO_WRAP)
+        val device = api.registerDevice(login.accessToken, pubB64)
+
+        // Server pubkey we authenticate against is still the EXIT server's
+        // — the entry just forwards UDP at L4 and doesn't terminate WG.
+        val serverPub = Base64.decode(exit.pubkey, Base64.DEFAULT)
+        require(serverPub.size == 32) { "exit server pubkey not 32 bytes" }
+
+        val cfg = WireGuardConfig(
+            privateKey = privKey,
+            address = device.ipv4_address,
+            dns = listOf(MULLVAD_DNS),
+            peerPublicKey = serverPub,
+            presharedKey = null,
+            allowedIps = listOf("0.0.0.0/0"),
+            endpointHost = entry.ipv4,
+            endpointPort = exit.multihopPort,
+            persistentKeepaliveSecs = 25,
+        )
+        return cfg to device
+    }
 }
