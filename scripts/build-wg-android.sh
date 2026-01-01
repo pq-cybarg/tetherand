@@ -22,6 +22,14 @@ export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$TOOLCHAIN/bin/aarch64-linux-a
 export CC_aarch64_linux_android="$TOOLCHAIN/bin/aarch64-linux-android26-clang"
 export AR_aarch64_linux_android="$TOOLCHAIN/bin/llvm-ar"
 
+# Strip build-host PII from the resulting .so: panic location strings
+# otherwise embed the absolute paths of every Rust source touched
+# (e.g. /Users/<your-mac-user>/.cargo/registry/...). --remap-path-prefix
+# rewrites those at compile time. We map $HOME → "~" and $CARGO_HOME →
+# "/cargo" so no real path leaks into the artifact.
+RUST_REMAP="--remap-path-prefix=$HOME=~ --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$RELAY=/build"
+export RUSTFLAGS="${RUSTFLAGS:-} $RUST_REMAP"
+
 cd "$RELAY"
 cargo build --release --target aarch64-linux-android -p tetherand-wg
 mkdir -p "$DEST"
