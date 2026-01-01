@@ -80,21 +80,18 @@ dependencies {
     // "highest security available across diverse cryptographic
     // assumptions". See ModelUpdater.kt for the full rationale.
     implementation("org.bouncycastle:bcprov-jdk18on:1.80")
-    // Apache Milagro AMCL — pure-Java BLS12-381 implementation.
-    // Used by PublicBeacons to verify drand-quicknet round signatures
-    // (BLS12-381 G1 pubkey × G2 signature, pairing-check verification).
-    // Pure Java with no native bindings; ~500 KB binary cost in
-    // exchange for full BLS verification of every drand round we
-    // absorb into the SeekerRng mixer.
-    //
-    // Exclusion: milagro 0.4.0 transitively pulls guava 23.0, which
-    // conflicts with newer guava (com.google.guava:listenablefuture
-    // is the modern carve-out) producing a Duplicate-class build
-    // failure. Milagro itself doesn't use ListenableFuture in the
-    // BLS code path we exercise, so dropping it is safe.
-    implementation("org.miracl.milagro.amcl:milagro-crypto-java:0.4.0") {
-        exclude(group = "com.google.guava", module = "guava")
-    }
+    // blst (Supranational) — audited BLS12-381 implementation used in
+    // drand-go, Eth2 consensus clients, Filecoin. Vendored locally:
+    //   * Generated SWIG Java bindings (`supranational.blst.*`)
+    //     live under `src/main/java/supranational/blst/`.
+    //   * Native libraries (`libblst.so`) cross-compiled from
+    //     `supranational/blst@HEAD` for `arm64-v8a` (Solana 5364C13D
+    //     target + the Android-15 ARM64 AVD) and `x86_64` (other
+    //     emulator AVDs); shipped under `jniLibs/<abi>/`.
+    // Replaces the earlier Milagro AMCL 0.4.0 dep which was
+    // unmaintained, unaudited, and shipped only legacy
+    // try-and-increment hash-to-curve (incompatible with drand's
+    // RFC 9380 SSWU). See DrandVerifier.kt for the verification path.
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     debugImplementation("androidx.compose.ui:ui-tooling")

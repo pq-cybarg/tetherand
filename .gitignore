@@ -18,4 +18,11 @@ build/
 /.pt-build/
 /.sdr-build/
 /android/app/src/main/jniLibs/**/*.so
+# Vendored blst (Supranational) cross-compiled for Android — committed
+# so fresh checkouts don't need the NDK to build. See
+# `docs/BLST_VENDOR_NOTES.md` for the cross-compile procedure.
+!/android/app/src/main/jniLibs/arm64-v8a/libblst.so
+!/android/app/src/main/jniLibs/arm64-v8a/libc++_shared.so
+!/android/app/src/main/jniLibs/x86_64/libblst.so
+!/android/app/src/main/jniLibs/x86_64/libc++_shared.so
 android/.kotlin/

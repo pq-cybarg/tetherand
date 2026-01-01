@@ -192,7 +192,9 @@ object PublicBeacons {
             // the random-oracle defense — the SHAKE mixer is robust
             // to hostile beacon bytes regardless.
             val verified = DrandVerifier.verify(round, sigHex)
-            if (!verified) {
+            if (verified) {
+                Log.i("PublicBeacons", "drand round $round BLS-verified + absorbed (blst pairing check passed)")
+            } else {
                 Log.i("PublicBeacons", "drand round $round absorbed under random-oracle fallback (BLS sig not verified)")
             }
             drandCache.set(hexToBytes(randHex))
