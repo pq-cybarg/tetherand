@@ -431,8 +431,12 @@ cat >> "$HTML" <<'STATIC_BODY'
     <tr><td><strong>M1</strong></td><td>Tether MVP: fork + rebrand, transport abstraction, USB-ADB + TCP transports, Compose Tether tab, <code>tetherand run</code> CLI. Replaces <code>connect.sh</code>.</td><td>10-14 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
     <tr><td><strong>M2</strong></td><td>More transports: Bluetooth RFCOMM + USB-AOA, ratatui dashboard, LaunchAgent + IOKit USB watcher.</td><td>10-14 h</td><td><span class="badge warn">NEXT</span></td></tr>
     <tr><td><strong>M3</strong></td><td>Privacy chain core: hop interface, WireGuard generic hop (BoringTun via JNI), chain orchestrator, Privacy tab with chain visualizer.</td><td>14-18 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
-    <tr><td><strong>M4a-c</strong></td><td>Mullvad classic WG + PQ tunnel (ML-KEM-1024 hybrid) + AF_INET-only kill-switch. DAITA / obfuscation / multihop / split-tunnel = M4d-g.</td><td>~10 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
-    <tr><td><strong>M5</strong></td><td>NymVPN embedded via JNI, 2-hop entry/exit through Sphinx mixnet.</td><td>6-10 h</td><td><span class="badge warn">NEXT</span></td></tr>
+    <tr><td><strong>M4a-c</strong></td><td>Mullvad classic WG + PQ tunnel (ML-KEM-1024 hybrid) + AF_INET-only kill-switch.</td><td>~10 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
+    <tr><td><strong>M4d</strong></td><td>Mullvad multihop — entry server pairs with a separate exit server through Mullvad's bridge infrastructure.</td><td>~4 h</td><td><span class="badge warn">NEXT</span></td></tr>
+    <tr><td><strong>M4e</strong></td><td>DAITA — Mullvad's Defense Against AI-guided Traffic Analysis (constant-bitrate padding + adaptive shaping).</td><td>~6 h</td><td>planned</td></tr>
+    <tr><td><strong>M4f</strong></td><td>Obfuscation transports — QUIC over 443, Shadowsocks, UDP-over-TCP. User picks per-chain.</td><td>~6 h</td><td>planned</td></tr>
+    <tr><td><strong>M4g</strong></td><td>Split-tunnel by app — per-UID exclusion list via VpnService.Builder.addDisallowedApplication.</td><td>~3 h</td><td>planned</td></tr>
+    <tr><td><strong>M5</strong></td><td>NymVPN embedded via JNI, 2-hop entry/exit through Sphinx mixnet.</td><td>6-10 h</td><td>planned</td></tr>
     <tr><td><strong>M6</strong></td><td>Tor + all PT bridges (obfs4, snowflake, meek, conjure, webtunnel) + PQ flags + vanguards.</td><td>14-18 h</td><td>planned</td></tr>
     <tr><td><strong>M7a</strong></td><td>Threat MVP (no SDR): NetMonster Tier 0 + AIMSICD BTSAlgorithm + bundled OpenCellID + SnoopSnitch high-level + Crocodile Hunter phone-side heuristics + Wi-Fi/BT/app audit + per-location baseline + Threat tab.</td><td>20-26 h</td><td>planned</td></tr>
     <tr><td><strong>M7b</strong></td><td>SDR mode: librtlsdr-android + hackrf_android + LTE control-channel decoder, SIB/MIB analysis, paging-storm detection.</td><td>12-16 h</td><td>planned</td></tr>

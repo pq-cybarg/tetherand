@@ -11,7 +11,8 @@ and `docs/superpowers/plans/` for per-milestone implementation plans.
 - **M1** (Tether MVP — Apache-2.0 forked relay + custom-branded APK): **shipped**.
 - **M3** (Privacy Chain core + WireGuard hop via BoringTun JNI): **shipped**.
 - **M4a-c** (Mullvad classic WG + PQ tunnel ML-KEM-1024 + kill-switch): **shipped**.
-- **M2, M4d-g, M5-M10**: planned. See spec.
+- **M4d-g** (multihop, DAITA, obfuscation transports, split-tunnel): **in progress** — required, not deferred.
+- **M2, M5-M10**: planned. See spec.
 
 ## Build
 
