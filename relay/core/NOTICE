@@ -1,0 +1,14 @@
+This crate is a fork of Genymobile/gnirehtet `relay-rust/`
+(https://github.com/Genymobile/gnirehtet), licensed under Apache-2.0.
+
+Original copyright: Copyright (C) 2017 Genymobile.
+
+Modifications by pq-cybarg, 2026, also Apache-2.0:
+  - Renamed crate from `gnirehtet` / `relaylib` to `tetherand-relay-core`.
+  - Removed Gnirehtet's binary-entry files (main.rs, cli_args.rs,
+    adb_monitor.rs, execution_error.rs, logger.rs) — the CLI lives
+    elsewhere in this workspace.
+  - Bumped edition to 2024 (no semantic changes; warnings only).
+
+The full Apache-2.0 LICENSE text from Gnirehtet is reproduced in
+upstream/LICENSE at the repo root.
