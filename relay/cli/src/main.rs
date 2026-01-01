@@ -42,12 +42,55 @@ enum Cmd {
     Status,
     /// M2: launch the ratatui dashboard.
     Tui,
+    /// M2 Bluetooth-RFCOMM subcommands (macOS only — bridges through
+    /// `tetherand-bt-bridge`, a Swift helper compiled from
+    /// `relay/cli/macos-bt-helper/`).
+    #[command(subcommand)]
+    Bt(BtCmd),
+}
+
+#[derive(Debug, Subcommand)]
+enum BtCmd {
+    /// List paired Bluetooth devices (delegates to IOBluetooth).
+    List,
+    /// Open RFCOMM to the named device, pipe its bytes to/from the
+    /// `tetherand` relay core listening on `--port`.
+    ///
+    /// When `--mock` is set, skips the IOBluetooth helper entirely
+    /// and instead bridges through `adb reverse tcp:31418 tcp:31418`
+    /// to the Android-side [BtRfcommServer] in mock mode. Lets the
+    /// dev loop exercise the entire BT codepath inside the
+    /// emulator without a paired Seeker.
+    Connect {
+        #[arg(long)] device: String,
+        #[arg(long, default_value_t = DEFAULT_TCP_PORT)] port: u16,
+        #[arg(long)] mock: bool,
+    },
 }
 
 mod tui;
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
 enum TransportChoice { Adb, Tcp }
+
+/// Resolve the path to the `tetherand-bt-bridge` Swift helper.
+/// Looked up next to the running `tetherand` binary, then in
+/// `./bin/` relative to CWD. Returns `None` on non-macOS hosts
+/// since the helper has no Linux / Windows analogue.
+fn bt_helper_path() -> Option<PathBuf> {
+    if !cfg!(target_os = "macos") { return None; }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            let candidate = parent.join("tetherand-bt-bridge");
+            if candidate.exists() { return Some(candidate); }
+        }
+    }
+    let cwd_local = PathBuf::from("bin/tetherand-bt-bridge");
+    if cwd_local.exists() { return Some(cwd_local); }
+    let cwd_rel = PathBuf::from("../bin/tetherand-bt-bridge");
+    if cwd_rel.exists() { return Some(cwd_rel); }
+    None
+}
 
 fn init_log(override_: Option<&str>) {
     let filter = override_
@@ -224,6 +267,173 @@ fn cmd_tui() -> Result<()> {
     tui::run(state).map_err(|e| anyhow::anyhow!("tui: {e}"))
 }
 
+fn cmd_bt_list() -> Result<()> {
+    let helper = bt_helper_path()
+        .context("tetherand-bt-bridge not found — run relay/cli/macos-bt-helper/build.sh on a macOS host")?;
+    let status = Command::new(&helper).arg("--list").status()
+        .with_context(|| format!("spawning {}", helper.display()))?;
+    if !status.success() {
+        anyhow::bail!("{} --list exited {}", helper.display(), status);
+    }
+    Ok(())
+}
+
+fn cmd_bt_connect(device: String, port: u16, mock: bool) -> Result<()> {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+    use std::process::Stdio;
+
+    if mock {
+        return cmd_bt_connect_mock(device, port);
+    }
+    let helper = bt_helper_path()
+        .context("tetherand-bt-bridge not found — run relay/cli/macos-bt-helper/build.sh on a macOS host")?;
+
+    // Start the relay core in a background thread so it's listening
+    // before the helper is told to connect. The relay binds to
+    // 127.0.0.1:<port> and accepts ONE client connection — that
+    // client is us (the BT-bridge pump below).
+    let relay_port = port;
+    thread::spawn(move || {
+        if let Err(e) = tetherand_relay_core::relay(relay_port) {
+            tracing::error!("relay core exited: {e}");
+        }
+    });
+    // Brief wait so relay's listen() races ahead of our connect().
+    // 50 ms is a lot longer than localhost socket-bind needs in
+    // practice (~1 ms); generous margin avoids a TOCTOU race on
+    // very-slow CI hosts.
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    // Spawn the Swift helper. Its stdout is the read side from BT;
+    // its stdin is the write side toward BT. Its stderr inherits
+    // so the user can see SDP / open errors in real time.
+    let mut child = Command::new(&helper)
+        .arg("--device").arg(&device)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .with_context(|| format!("spawning {} --device {}", helper.display(), device))?;
+    info!("tetherand-bt-bridge spawned (pid {}) for device '{}'", child.id(), device);
+
+    let mut helper_stdin = child.stdin.take().expect("piped stdin");
+    let mut helper_stdout = child.stdout.take().expect("piped stdout");
+
+    // Connect to relay-core.
+    let mut tcp = TcpStream::connect(("127.0.0.1", port))
+        .with_context(|| format!("connecting to relay-core 127.0.0.1:{port}"))?;
+    let tcp_clone = tcp.try_clone().context("dup'ing TCP socket")?;
+
+    // helper_stdout → tcp_write (BT-from-device → relay-core)
+    let h_to_relay = thread::spawn(move || -> Result<()> {
+        let mut tcp = tcp_clone;
+        let mut buf = [0u8; 4096];
+        loop {
+            let n = helper_stdout.read(&mut buf)?;
+            if n == 0 { break; }
+            tcp.write_all(&buf[..n])?;
+        }
+        Ok(())
+    });
+
+    // tcp_read → helper_stdin (relay-core → BT-to-device)
+    let relay_to_h = thread::spawn(move || -> Result<()> {
+        let mut buf = [0u8; 4096];
+        loop {
+            let n = tcp.read(&mut buf)?;
+            if n == 0 { break; }
+            helper_stdin.write_all(&buf[..n])?;
+        }
+        Ok(())
+    });
+
+    // Wait for the helper to exit (e.g. user disconnects BT or
+    // closes Tetherand on the Seeker) — whichever pump dies first
+    // is signaled via Child::wait() below.
+    let status = child.wait().context("waiting on tetherand-bt-bridge")?;
+    let _ = h_to_relay.join();
+    let _ = relay_to_h.join();
+    if !status.success() {
+        anyhow::bail!("tetherand-bt-bridge exited {status}");
+    }
+    Ok(())
+}
+
+/// Loopback port the Android-side [BtRfcommServer] binds in mock
+/// mode. Must match BtRfcommServer.MOCK_PORT.
+const BT_MOCK_PORT: u16 = 31418;
+
+/// Mock-mode BT bridge: uses adb-reverse + a single TCP connection
+/// instead of IOBluetooth. The byte-level semantics match the real
+/// RFCOMM channel, so the rest of the pipeline (relay-core, frame
+/// codec, transport-mux) is exercised identically.
+fn cmd_bt_connect_mock(device: String, port: u16) -> Result<()> {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+
+    let _ = device;  // serial is informational for adb; bare `adb` works against the default device
+    // 1. adb reverse so the emulator's 127.0.0.1:31418 (where the mock
+    //    BtRfcommServer listens) is reachable from the Mac's
+    //    127.0.0.1:31418.
+    let adb_status = Command::new(adb_path())
+        .args(["reverse", &format!("tcp:{BT_MOCK_PORT}"), &format!("tcp:{BT_MOCK_PORT}")])
+        .status()
+        .context("spawning adb reverse for BT mock")?;
+    if !adb_status.success() {
+        anyhow::bail!("adb reverse tcp:{BT_MOCK_PORT} failed; is the emulator attached?");
+    }
+
+    // 2. Start relay-core in a background thread.
+    let relay_port = port;
+    thread::spawn(move || {
+        if let Err(e) = tetherand_relay_core::relay(relay_port) {
+            tracing::error!("relay core exited: {e}");
+        }
+    });
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    // 3. Open the BT-mock TCP socket through adb. This is the
+    //    moral equivalent of the IOBluetoothRFCOMMChannel in the
+    //    real-BT path.
+    let mut bt = TcpStream::connect(("127.0.0.1", BT_MOCK_PORT))
+        .with_context(|| format!("connecting to BT-mock 127.0.0.1:{BT_MOCK_PORT} (adb-reversed to emulator)"))?;
+    info!("BT mock connected to emulator 127.0.0.1:{BT_MOCK_PORT}");
+
+    // 4. Open relay-core client socket.
+    let mut tcp = TcpStream::connect(("127.0.0.1", port))
+        .with_context(|| format!("connecting to relay-core 127.0.0.1:{port}"))?;
+    let tcp_clone = tcp.try_clone().context("dup'ing relay TCP socket")?;
+    let bt_clone = bt.try_clone().context("dup'ing BT-mock TCP socket")?;
+
+    // 5. Bidirectional byte pumps — same shape as the helper-based
+    //    path in [cmd_bt_connect], just with TCP instead of stdio.
+    let bt_to_relay = thread::spawn(move || -> Result<()> {
+        let mut bt = bt_clone;
+        let mut tcp = tcp_clone;
+        let mut buf = [0u8; 4096];
+        loop {
+            let n = bt.read(&mut buf)?;
+            if n == 0 { break; }
+            tcp.write_all(&buf[..n])?;
+        }
+        Ok(())
+    });
+    let relay_to_bt = thread::spawn(move || -> Result<()> {
+        let mut buf = [0u8; 4096];
+        loop {
+            let n = tcp.read(&mut buf)?;
+            if n == 0 { break; }
+            bt.write_all(&buf[..n])?;
+        }
+        Ok(())
+    });
+
+    let _ = bt_to_relay.join();
+    let _ = relay_to_bt.join();
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     init_log(cli.log.as_deref());
@@ -234,5 +444,7 @@ fn main() -> Result<()> {
         Cmd::Reinstall { device }            => { adb_uninstall(device.as_deref())?; adb_install(device.as_deref()) }
         Cmd::Status                          => cmd_status(),
         Cmd::Tui                             => cmd_tui(),
+        Cmd::Bt(BtCmd::List)                 => cmd_bt_list(),
+        Cmd::Bt(BtCmd::Connect { device, port, mock }) => cmd_bt_connect(device, port, mock),
     }
 }

@@ -12,6 +12,7 @@ import android.util.Log
 import dev.tetherand.app.crypto.BootIntegrity
 import dev.tetherand.app.crypto.SeekerRng
 import dev.tetherand.app.service.TetherandChainService
+import dev.tetherand.app.transport.BtRfcommServer
 import dev.tetherand.app.ui.TabbedRoot
 import dev.tetherand.app.ui.TetherandTheme
 
@@ -20,6 +21,12 @@ class MainActivity : ComponentActivity() {
     private var pending: PendingAction = PendingAction.TETHER
     private var pendingWgConfig: String? = null
     private var pendingPq: Boolean = false
+    /** Bluetooth-RFCOMM server (real or mock). On emulator / hosts
+     *  without a BT stack, [BtRfcommServer] auto-engages mock mode
+     *  and binds a localhost TCP listener instead — see its class
+     *  KDoc. Held on the activity scope for v0.1; M2.x promotes it
+     *  to a dedicated foreground service alongside [TetherandChainService]. */
+    private var btServer: BtRfcommServer? = null
 
     private val vpnConsent = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -66,6 +73,20 @@ class MainActivity : ComponentActivity() {
             // POST_NOTIFICATIONS on first launch. The Threat tab still works
             // (Room flow), just without live collection until permission lands.
         }
+        // Start the BT-RFCOMM listener. On real hardware this opens a
+        // BluetoothServerSocket bound to TETHERAND_UUID; on emulator
+        // (and any host where the BT adapter is absent or
+        // tetherand.bt.mock=1 is set) it falls back to a localhost
+        // TCP listener so the Mac CLI's `tetherand bt connect --mock`
+        // path can exercise the entire transport without paired
+        // hardware. See feedback_hardware_mocks.md for the policy.
+        btServer = BtRfcommServer(applicationContext).also { it.start() }
+    }
+
+    override fun onDestroy() {
+        try { btServer?.stop() } catch (_: Throwable) {}
+        btServer = null
+        super.onDestroy()
         setContent {
             TetherandTheme {
                 TabbedRoot(

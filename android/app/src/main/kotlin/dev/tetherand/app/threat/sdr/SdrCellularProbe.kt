@@ -1,7 +1,9 @@
 package dev.tetherand.app.threat.sdr
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
+import kotlin.math.sin
 
 /**
  * SDR-driven cellular-band signal-strength probe (M7b mid-tier).
@@ -76,6 +78,21 @@ class SdrCellularProbe(private val ctx: Context) {
      * indicating "SDR attached; JNI shim pending — using degraded mode".
      */
     fun snapshot(): List<BandReading> {
+        // Mock mode: emulator hosts (no USB-OTG, no SDR attachable) get
+        // synthetic dBm values so the heuristic + alert pipeline can be
+        // exercised end-to-end in the dev loop. See [shouldUseMock] for
+        // the exact gate (Build.FINGERPRINT / Build.HARDWARE +
+        // tetherand.sdr.mock system property).
+        if (shouldUseMock()) {
+            return cellularBands.mapIndexed { idx, band ->
+                BandReading(
+                    band = band.name,
+                    centerMhz = (band.lowMhz + band.highMhz) / 2,
+                    dBm = mockDbm(idx),
+                    anomaly = AnomalyHint.None,
+                )
+            }
+        }
         if (!SdrDetector.isSdrAvailable(ctx)) return emptyList()
         return try {
             cellularBands.map { band ->
@@ -90,6 +107,44 @@ class SdrCellularProbe(private val ctx: Context) {
             Log.w(TAG, "snapshot failed: ${t.javaClass.simpleName}")
             emptyList()
         }
+    }
+
+    /** True if we should synthesize dBm values instead of calling
+     *  the native shim. Auto-on for emulator builds; can be forced
+     *  on/off via the `tetherand.sdr.mock` system property. */
+    private fun shouldUseMock(): Boolean {
+        val sysprop = System.getProperty("tetherand.sdr.mock", "")
+        if (sysprop.equals("1", true) || sysprop.equals("true", true)) return true
+        if (sysprop.equals("0", true) || sysprop.equals("false", true)) return false
+        val isEmulator = Build.FINGERPRINT.contains("generic", ignoreCase = true) ||
+                         Build.HARDWARE.contains("ranchu", ignoreCase = true) ||
+                         Build.HARDWARE.contains("goldfish", ignoreCase = true)
+        return isEmulator
+    }
+
+    /** Synthetic dBm value per band, derived from a low-frequency
+     *  sinusoid offset by band index + millisecond clock. Designed
+     *  so:
+     *   - Most bands sit between -85 and -65 dBm (realistic "quiet
+     *     neighbourhood" floor).
+     *   - The 5G NR n71 / LTE B14 bands occasionally spike above
+     *     -60 dBm to trigger the existing Sdr_Cellular_Anomaly
+     *     alert path — so the alert pipeline gets empirical
+     *     exercise without real RF.
+     *
+     *  Deterministic enough to be unit-testable; varying enough
+     *  to look real in logcat. */
+    private fun mockDbm(bandIdx: Int): Float {
+        val t = (System.currentTimeMillis() / 1000.0) % (2 * Math.PI)
+        // Base floor varies per band so the table isn't flat.
+        val floor = -80f + (bandIdx % 3) * 4f
+        // Sinusoidal envelope: ±10 dBm swing.
+        val swing = (10.0 * sin(t + bandIdx * 0.7)).toFloat()
+        // FirstNet (idx 4) and 5G n71 (idx 8) get a periodic spike so
+        // the anomaly threshold (-60 dBm) trips occasionally — useful
+        // for verifying the ThreatDetectionService → fire() codepath.
+        val spike = if ((bandIdx == 4 || bandIdx == 8) && (System.currentTimeMillis() / 1000) % 7 < 2) 30f else 0f
+        return floor + swing + spike
     }
 
     /**
