@@ -10,7 +10,7 @@
 #                                              webtunnel PT bridge)
 #   pts   — libconjure_client.so [+ snowflake] (M6.x Go-upstream PTs)
 #   sdr   — librtlsdr.so + libhackrf.so +
-#           libusb1.0.so                       (M7b SDR stack)
+#           libusb-1.0.so                       (M7b SDR stack)
 #
 # 6 groups → 2^6 = 64 combinations (including the empty one). Each
 # combination becomes one zip under dist/bundles/, named with the
@@ -34,7 +34,7 @@ GROUP[tor]="libtetherand_tor.so"
 GROUP[nym]="libtetherand_nym.so"
 GROUP[pt]="libtetherand_pt.so"
 GROUP[pts]="libconjure_client.so libsnowflake_client.so"
-GROUP[sdr]="librtlsdr.so libhackrf.so libusb1.0.so"
+GROUP[sdr]="librtlsdr.so libhackrf.so libusb-1.0.so"
 
 # Determine which groups have ALL their files present.
 present_groups=()

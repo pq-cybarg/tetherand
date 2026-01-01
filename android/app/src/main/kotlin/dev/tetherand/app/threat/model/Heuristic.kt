@@ -10,4 +10,5 @@ enum class Heuristic {
     Evil_Twin_Wifi,          // ours
     Permission_Diff,         // ours
     Untrusted_Tracker_Ble,   // ours
+    Sdr_Cellular_Anomaly,    // M7b mid-tier (SDR-driven cellular-band RSSI delta)
 }

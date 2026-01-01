@@ -25,7 +25,10 @@ import dev.tetherand.app.threat.heuristic.RatDowngrade
 import dev.tetherand.app.threat.heuristic.ReattachStorm
 import dev.tetherand.app.threat.heuristic.TacChangeNoMotion
 import dev.tetherand.app.threat.model.Alert
+import dev.tetherand.app.threat.model.Heuristic
+import dev.tetherand.app.threat.model.Severity
 import dev.tetherand.app.threat.model.ThreatDb
+import dev.tetherand.app.threat.sdr.SdrCellularProbe
 import dev.tetherand.app.threat.util.Geohash6
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +54,12 @@ class ThreatDetectionService : Service() {
     private val storm = ReattachStorm()
     private val twin = EvilTwinWifi()
     private val permDiff = PermissionDiff()
+    /** SDR-driven cellular-band RSSI probe (M7b mid-tier). Lazy
+     *  so the System.loadLibrary("tetherand_sdr") inside the
+     *  companion fires only when the service actually starts —
+     *  important because not every device has the SDR .so and we
+     *  want construct-without-load semantics elsewhere. */
+    private val sdrProbe by lazy { SdrCellularProbe(applicationContext) }
 
     private var lastSnapshot: AppSnapshot? = null
 
@@ -124,6 +133,47 @@ class ThreatDetectionService : Service() {
                 dev.tetherand.app.threat.heuristic.PatchLevelStaleness.evaluate(applicationContext)?.let { fire(it) }
                 dev.tetherand.app.threat.heuristic.AdbdNetworkSurface.evaluate(applicationContext)?.let { fire(it) }
                 delay(6L * 3600 * 1000)
+            }
+        }
+        // SDR-driven cellular-band RSSI sweep every 60 s. When no
+        // RTL-SDR is attached the probe returns emptyList() cheaply;
+        // when one IS attached the sweep produces a per-band dBm
+        // table that the existing anomaly threshold (currently a
+        // crude +20 dBm above a rolling baseline) converts into
+        // alerts. The full anomaly classifier with the rolling
+        // baseline lives in M7b.x alongside the srsRAN decoder;
+        // v0.1 emits a logcat-only "sdr sweep" line per band when
+        // dBm is non-NaN — sufficient to validate the JNI surface
+        // empirically on a hardware-attached device.
+        scope.launch {
+            while (isActive) {
+                runSdrHeuristics()
+                delay(60_000)
+            }
+        }
+    }
+
+    private suspend fun runSdrHeuristics() {
+        val readings = sdrProbe.snapshot()
+        if (readings.isEmpty()) return  // no SDR attached
+        for (r in readings) {
+            if (r.dBm.isNaN()) continue
+            Log.i(TAG, "sdr sweep: ${r.band} @ ${r.centerMhz} MHz → ${"%.1f".format(r.dBm)} dBm")
+            // Crude threshold: +20 dBm above a fixed "quiet"
+            // floor of -80 dBm. A future patch replaces the
+            // floor with a per-band rolling baseline (same
+            // pattern as BaselineStore for the cell tower data).
+            if (r.dBm > -60f) {
+                fire(
+                    Alert(
+                        tsMs = System.currentTimeMillis(),
+                        heuristic = Heuristic.Sdr_Cellular_Anomaly,
+                        severity = Severity.Medium,
+                        summary = "SDR: elevated energy on ${r.band} (${"%.1f".format(r.dBm)} dBm)",
+                        evidenceJson = """{"band":"${r.band}","center_mhz":${r.centerMhz},"dbm":${r.dBm}}""",
+                        geohash6 = null,
+                    )
+                )
             }
         }
     }

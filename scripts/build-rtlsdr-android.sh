@@ -40,7 +40,7 @@ fi
 cmake -S "$WORK/libusb" -B "$WORK/libusb/build" "${CMAKE_ARGS[@]}" \
     -DLIBUSB_BUILD_EXAMPLES=OFF -DLIBUSB_BUILD_TESTING=OFF
 cmake --build "$WORK/libusb/build" --target usb-1.0 -j
-cp "$WORK/libusb/build/libusb-1.0.so" "$OUT_DIR/libusb1.0.so"
+cp "$WORK/libusb/build/libusb-1.0.so" "$OUT_DIR/libusb-1.0.so"
 
 # -- librtlsdr ------------------------------------------------------------
 if [ ! -d "$WORK/rtlsdr" ]; then
@@ -59,7 +59,7 @@ cmake -S "$WORK/rtlsdr" -B "$WORK/rtlsdr/build" "${CMAKE_ARGS[@]}" \
     -DINSTALL_UDEV_RULES=OFF -DDETACH_KERNEL_DRIVER=OFF
 cmake --build "$WORK/rtlsdr/build" --target rtlsdr -j
 cp "$WORK/rtlsdr/build/src/librtlsdr.so" "$OUT_DIR/librtlsdr.so"
-cp "$WORK/libusb/build/libusb-1.0.so" "$OUT_DIR/libusb1.0.so"
+cp "$WORK/libusb/build/libusb-1.0.so" "$OUT_DIR/libusb-1.0.so"
 
 # -- libhackrf ------------------------------------------------------------
 if [ ! -d "$WORK/hackrf" ]; then
@@ -72,5 +72,22 @@ cmake -S "$WORK/hackrf/host/libhackrf" -B "$WORK/hackrf/build" "${CMAKE_ARGS[@]}
 cmake --build "$WORK/hackrf/build" --target hackrf -j
 find "$WORK/hackrf/build" -name "libhackrf.so" -exec cp {} "$OUT_DIR/libhackrf.so" \;
 
-ls -lh "$OUT_DIR/libusb1.0.so" "$OUT_DIR/librtlsdr.so" "$OUT_DIR/libhackrf.so"
-echo "M7b SDR libs built + staged. Wire the libtetherand_sdr.so JNI surface next."
+# -- libtetherand_sdr (JNI shim into librtlsdr) ---------------------------
+# Thin C wrapper exposing
+# Java_dev_tetherand_app_threat_sdr_SdrCellularProbe_nativeRtlSdrPowerDbm
+# linked against the cross-compiled librtlsdr.so. Compiled with clang
+# directly (no cmake — one source file, one external dep).
+CLANG="$TOOLCHAIN/$HOST_TAG/bin/aarch64-linux-android${API}-clang"
+SYSROOT="$TOOLCHAIN/$HOST_TAG/sysroot"
+"$CLANG" \
+    -O2 -fPIC -fvisibility=hidden -shared -std=c11 \
+    -Wall -Wextra -Wno-unused-parameter \
+    --sysroot="$SYSROOT" \
+    -I"$WORK/rtlsdr/include" \
+    -L"$WORK/rtlsdr/build/src" \
+    -o "$OUT_DIR/libtetherand_sdr.so" \
+    "$REPO_ROOT/scripts/sdr_jni/sdr_jni.c" \
+    -lrtlsdr -lm -llog
+
+ls -lh "$OUT_DIR/libusb-1.0.so" "$OUT_DIR/librtlsdr.so" "$OUT_DIR/libhackrf.so" "$OUT_DIR/libtetherand_sdr.so"
+echo "M7b SDR libs built + staged (libtetherand_sdr.so wired into librtlsdr.so)."

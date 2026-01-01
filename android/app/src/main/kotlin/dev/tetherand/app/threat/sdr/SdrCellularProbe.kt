@@ -126,11 +126,24 @@ class SdrCellularProbe(private val ctx: Context) {
     companion object {
         private const val TAG = "SdrCellularProbe"
 
+        @Volatile var libLoaded: Boolean = false
+            private set
+
         init {
             // Loading the lib is optional — many devices won't have it.
             // We swallow UnsatisfiedLinkError so SdrCellularProbe stays
-            // constructible even when the native shim is absent.
-            try { System.loadLibrary("tetherand_sdr") } catch (_: Throwable) {}
+            // constructible even when the native shim is absent. The
+            // libLoaded flag + logcat line gives an empirical signal
+            // of whether the RTL-SDR JNI surface is wired on this
+            // build (useful on emulator where no actual SDR can be
+            // attached but the .so can still be load-verified).
+            try {
+                System.loadLibrary("tetherand_sdr")
+                libLoaded = true
+                Log.i(TAG, "libtetherand_sdr.so loaded — RTL-SDR JNI surface ready")
+            } catch (t: Throwable) {
+                Log.i(TAG, "libtetherand_sdr.so unavailable (${t.javaClass.simpleName}); SDR features degraded")
+            }
         }
 
         /** JNI shim into librtlsdr-android. Returns dBm power at the
