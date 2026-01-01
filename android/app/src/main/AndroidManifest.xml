@@ -22,6 +22,11 @@
          18-22 kHz band). Runtime-prompted via Compose when Hardened
          Mode arms; listener no-ops cleanly if denied. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- M9.x selfie-on-failed-unlock. Front-camera capture only fires
+         on actual failed-unlock callbacks from the keyguard; we never
+         open the camera in the background otherwise. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
 
     <application
         android:label="Tetherand"
@@ -147,5 +152,22 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE"/>
             </intent-filter>
         </service>
+
+        <!-- M9.x selfie-on-failed-unlock: receives onPasswordFailed
+             callbacks from the keyguard when the user enables this
+             app as a Device Admin via Settings > Security > Device
+             admin apps. The XML below declares only watch-login —
+             the minimum-privilege policy needed for the callback. -->
+        <receiver
+            android:name=".hardened.selfie.SelfieAdminReceiver"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/selfie_device_admin"/>
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/>
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

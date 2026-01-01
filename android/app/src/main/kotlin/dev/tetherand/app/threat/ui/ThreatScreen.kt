@@ -72,6 +72,7 @@ fun ThreatScreen() {
         // user-action checklist sits above the kill-switch.
         dev.tetherand.app.hardened.ui.HardenedSection()
         dev.tetherand.app.hardened.deadman.DeadmansCard()
+        dev.tetherand.app.hardened.selfie.SelfieCard()
         dev.tetherand.app.hardened.ui.IncidentResponseCard()
         // Heuristic suppressions (acknowledge known-acceptable risks).
         dev.tetherand.app.threat.heuristic.SuppressionsCard()
