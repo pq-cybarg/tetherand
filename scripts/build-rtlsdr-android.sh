@@ -46,23 +46,31 @@ cp "$WORK/libusb/build/libusb-1.0.so" "$OUT_DIR/libusb1.0.so"
 if [ ! -d "$WORK/rtlsdr" ]; then
     git clone --depth 1 https://gitea.osmocom.org/sdr/rtl-sdr.git "$WORK/rtlsdr"
 fi
+# rtlsdr's CMakeLists hardcodes `-lusb-1.0` in the link command rather
+# than using LIBUSB_LIBRARIES, so we need both the file path AND a
+# search-dir flag pointing at the libusb build output. Then we copy
+# the file under the conventional name so the dynamic loader on
+# Android resolves it at runtime.
 cmake -S "$WORK/rtlsdr" -B "$WORK/rtlsdr/build" "${CMAKE_ARGS[@]}" \
-    -DLIBUSB_INCLUDE_DIR="$WORK/libusb/libusb" \
-    -DLIBUSB_LIBRARIES="$OUT_DIR/libusb1.0.so" \
+    -DLIBUSB_INCLUDE_DIR="$WORK/libusb/libusb/libusb" \
+    -DLIBUSB_LIBRARIES="$WORK/libusb/build/libusb-1.0.so" \
+    -DCMAKE_SHARED_LINKER_FLAGS="-L$WORK/libusb/build" \
+    -DCMAKE_EXE_LINKER_FLAGS="-L$WORK/libusb/build" \
     -DINSTALL_UDEV_RULES=OFF -DDETACH_KERNEL_DRIVER=OFF
 cmake --build "$WORK/rtlsdr/build" --target rtlsdr -j
 cp "$WORK/rtlsdr/build/src/librtlsdr.so" "$OUT_DIR/librtlsdr.so"
+cp "$WORK/libusb/build/libusb-1.0.so" "$OUT_DIR/libusb1.0.so"
 
 # -- libhackrf ------------------------------------------------------------
 if [ ! -d "$WORK/hackrf" ]; then
     git clone --depth 1 https://github.com/greatscottgadgets/hackrf.git "$WORK/hackrf"
 fi
 cmake -S "$WORK/hackrf/host/libhackrf" -B "$WORK/hackrf/build" "${CMAKE_ARGS[@]}" \
-    -DLIBUSB_INCLUDE_DIR="$WORK/libusb/libusb" \
-    -DLIBUSB_LIBRARIES="$OUT_DIR/libusb1.0.so"
+    -DLIBUSB_INCLUDE_DIR="$WORK/libusb/libusb/libusb" \
+    -DLIBUSB_LIBRARIES="$WORK/libusb/build/libusb-1.0.so" \
+    -DCMAKE_SHARED_LINKER_FLAGS="-L$WORK/libusb/build"
 cmake --build "$WORK/hackrf/build" --target hackrf -j
-cp "$WORK/hackrf/build/src/libhackrf.so" "$OUT_DIR/libhackrf.so" 2>/dev/null \
-    || cp "$WORK/hackrf/build/libhackrf.so" "$OUT_DIR/libhackrf.so"
+find "$WORK/hackrf/build" -name "libhackrf.so" -exec cp {} "$OUT_DIR/libhackrf.so" \;
 
 ls -lh "$OUT_DIR/libusb1.0.so" "$OUT_DIR/librtlsdr.so" "$OUT_DIR/libhackrf.so"
 echo "M7b SDR libs built + staged. Wire the libtetherand_sdr.so JNI surface next."

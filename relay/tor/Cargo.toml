@@ -27,6 +27,12 @@ tor-config = "0.27"
 # PQ-NTor (prop362 / NTor-ML-KEM-v1 hybrid) gate, we can flip it via
 # the lower-level surface without re-wiring the cargo tree.
 tor-proto = "0.27"
+# arti's tor-dirmgr pulls rusqlite for the directory cache. On Android
+# NDK sysroot there's no libsqlite3 to link against, so we add an
+# explicit dep with `bundled` so rusqlite ships its own SQLite via
+# the libsqlite3-sys C build. Cargo unions features, so this flips the
+# transitive on.
+rusqlite = { version = "0.32", features = ["bundled"] }
 tokio = { version = "1.43", features = ["rt-multi-thread", "macros", "net", "sync", "io-util"] }
 log = "0.4"
 android_logger = { version = "0.14", optional = true }
