@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- M2: AOA accessory filter. Matches what the host CLI sends in the
+     SEND_STRING control transfers (see relay/transport-aoa/src/lib.rs
+     TETHERAND_AOA_IDENTITY). -->
+<resources>
+    <usb-accessory
+        manufacturer="Tetherand"
+        model="TetherandRelay"
+        version="0.1.0"/>
+</resources>

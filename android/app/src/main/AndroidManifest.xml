@@ -88,6 +88,19 @@
                 android:value="privacy_chain"/>
         </service>
 
+        <!-- M2: USB Open Accessory receiver. Wakes when the host (Mac)
+             switches the Seeker into accessory mode via control transfers. -->
+        <service
+            android:name=".transport.AoaAccessoryService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED"
+                android:resource="@xml/aoa_accessory_filter"/>
+        </service>
+
         <!-- M9: Hardened Mode honeypot. Binds 6 unprivileged TCP ports
              (8080/8443/8000/9000/1080/3128) and logs every inbound
              connection as a High-severity Alert via ThreatDb. Foreground

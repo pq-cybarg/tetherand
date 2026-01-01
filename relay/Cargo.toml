@@ -10,6 +10,8 @@ members = [
     "wg",             # M3: BoringTun WireGuard wrapper + JNI bindings for Android
     "tor",            # M6: arti-client embedded + bridges + vanguards + JNI for Android
     "pt-bridge",      # M6.x: PT-spec binary implementing obfs4 + meek + webtunnel
+    "transport-bt",   # M2: Bluetooth RFCOMM transport (host Mac discovers Seeker)
+    "transport-aoa",  # M2: USB-AOA transport (Mac switches Seeker into accessory mode)
 ]
 
 [workspace.package]
