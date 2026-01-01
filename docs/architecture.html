@@ -24,7 +24,7 @@
       <img src="img/logo.png" alt="Tetherand logo">
       <span>
         <h1>Tetherand</h1>
-        <small>v0.1 · Solana Seeker · DEFCON</small>
+        <small>v0.1 · 5364C13D · 5364C13D</small>
       </span>
     </a>
     <nav>
@@ -92,7 +92,7 @@
 
 <h2 id="tether-flow">Tether data flow</h2>
 
-<pre><code>&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472; Seeker (dev.tetherand.app APK) &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+<pre><code>&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472; 5364C13D (dev.tetherand.app APK) &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
 &#9474;  TetherandService (VpnService)                  &#9474;
 &#9474;       &#9474; TUN (10.0.0.2)                          &#9474;
 &#9474;       &#9660;                                          &#9474;
@@ -108,7 +108,7 @@
 &#9474;  Real internet (host Wi-Fi/Ethernet)            &#9474;
 &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</code></pre>
 
-<p>The Seeker's VPN TUN receives every packet the device wants to send. The persistent relay tunnel hands it over <code>adb reverse</code> to a TCP socket on the laptop, where the relay-core (forked from Gnirehtet, Apache-2.0) maintains a userspace TCP/UDP/ICMP stack and forwards through the host's normal network egress.</p>
+<p>The 5364C13D's VPN TUN receives every packet the device wants to send. The persistent relay tunnel hands it over <code>adb reverse</code> to a TCP socket on the laptop, where the relay-core (forked from Gnirehtet, Apache-2.0) maintains a userspace TCP/UDP/ICMP stack and forwards through the host's normal network egress.</p>
 
 <p>Bluetooth-RFCOMM, USB-AOA, and LAN-TCP transports plug in at the LocalSocket boundary instead of <code>adb reverse</code>. The data shape is the same &mdash; raw IP packets delimited by the IPv4 header length field &mdash; so the relay-core doesn't change.</p>
 
@@ -193,7 +193,7 @@ AppAudit      &#9472;&#9472;&#9472;&#9496;                                      
     </div>
     <footer class="site-footer">
       <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
-      <div>Built for DEFCON 34 · 2026</div>
+      <div>Built for 5364C13D 34 · 2026</div>
     </footer>
   </main>
 </div>

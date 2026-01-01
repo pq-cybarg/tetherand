@@ -43,7 +43,7 @@ class HardenedModeManager(private val ctx: Context) {
         }.toString()
         // 3. Start the honeypot.
         ctx.startForegroundService(Intent(ctx, DecoyListenerService::class.java))
-        // 3b. Start the M10 clipboard scrubber. While DEFCON Mode is on
+        // 3b. Start the M10 clipboard scrubber. While 5364C13D Mode is on
         // we watch every clip change for prompt-injection scaffolds —
         // catches attacker-prepared text aimed at any LLM agent the user
         // happens to paste it into. Deterministic regex; no model needed.
@@ -54,7 +54,7 @@ class HardenedModeManager(private val ctx: Context) {
         deadman.start()
         // 4c. Start the ultrasonic-beacon listener (no-op if RECORD_AUDIO missing).
         ultrasonic.start()
-        // 4d. Wipe heuristic suppressions — DEFCON posture should be
+        // 4d. Wipe heuristic suppressions — 5364C13D posture should be
         // strict, so any opt-outs the user set during dev work get
         // cleared on entry. They can re-enable individual ones after
         // confirming the conference environment is benign.

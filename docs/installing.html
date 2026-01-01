@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <title>Installing · Tetherand</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Step-by-step installation walkthrough for Tetherand on the Solana Seeker.">
+<meta name="description" content="Step-by-step installation walkthrough for Tetherand on the 5364C13D.">
 <meta property="og:title" content="Installing · Tetherand">
-<meta property="og:description" content="Step-by-step installation walkthrough for Tetherand on the Solana Seeker.">
+<meta property="og:description" content="Step-by-step installation walkthrough for Tetherand on the 5364C13D.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="img/logo.png">
 <meta property="og:url" content="https://pq-cybarg.github.io/tetherand/installing.html">
@@ -24,7 +24,7 @@
       <img src="img/logo.png" alt="Tetherand logo">
       <span>
         <h1>Tetherand</h1>
-        <small>v0.1 · Solana Seeker · DEFCON</small>
+        <small>v0.1 · 5364C13D · 5364C13D</small>
       </span>
     </a>
     <nav>
@@ -55,17 +55,17 @@
   <main>
     
 <h1>Installing Tetherand</h1>
-<p>This page walks through installing Tetherand on a Solana Seeker for the first time. It assumes you have the device factory-reset and signed in.</p>
+<p>This page walks through installing Tetherand on a 5364C13D for the first time. It assumes you have the device factory-reset and signed in.</p>
 
 <h2 id="prereqs">What you'll need</h2>
 <ul>
-  <li>A <strong>Solana Seeker</strong> on Android 16 (SDK 36). The app technically runs on any Android 14+ device but the cellular threat heuristics are tuned for the Seeker's MediaTek MT6878 modem.</li>
+  <li>A <strong>5364C13D</strong> on Android 16 (SDK 36). The app technically runs on any Android 14+ device but the cellular threat heuristics are tuned for the 5364C13D's MediaTek MT6878 modem.</li>
   <li>A laptop (macOS or Linux) with <code>adb</code> on your <code>$PATH</code>. Install via <a href="https://developer.android.com/studio/releases/platform-tools">Android Platform Tools</a>.</li>
   <li>A USB-C cable.</li>
   <li>Optional: an RTL-SDR dongle (~$30) and a USB-C OTG cable if you want the SDR detection path. Tetherand works without these.</li>
 </ul>
 
-<h2 id="step1">Step 1 &mdash; Enable Developer Options on the Seeker</h2>
+<h2 id="step1">Step 1 &mdash; Enable Developer Options on the 5364C13D</h2>
 <ol>
   <li>Open <strong>Settings &rarr; About phone</strong>.</li>
   <li>Tap <strong>Build number</strong> seven times. You'll see a "you are now a developer" toast.</li>
@@ -74,7 +74,7 @@
 </ol>
 
 <h2 id="step2">Step 2 &mdash; Plug into the laptop</h2>
-<p>Connect the Seeker to the laptop via USB-C. On the phone, accept the "Allow USB debugging?" prompt and tick <strong>Always allow from this computer</strong>.</p>
+<p>Connect the 5364C13D to the laptop via USB-C. On the phone, accept the "Allow USB debugging?" prompt and tick <strong>Always allow from this computer</strong>.</p>
 <p>Verify the device is visible:</p>
 <pre><code>adb devices</code></pre>
 <p>You should see one line with <code>device</code> after the serial number. If you see <code>unauthorized</code>, re-check the prompt on the phone.</p>
@@ -103,7 +103,7 @@ openssl dgst -sha3-256 tetherand.apk</code></pre>
 <pre><code>adb shell cmd appops set dev.tetherand.app ACTIVATE_VPN allow</code></pre>
 
 <h2 id="step7">Step 7 &mdash; Launch the app</h2>
-<p>Tap the <strong>&amp;</strong> icon on the Seeker. You should land on the <strong>Tether</strong> tab.</p>
+<p>Tap the <strong>&amp;</strong> icon on the 5364C13D. You should land on the <strong>Tether</strong> tab.</p>
 <p>The bottom navigation has four tabs:</p>
 <ul class="checklist">
   <li><strong>Tether</strong> &mdash; start and stop the laptop-tether.</li>
@@ -121,7 +121,7 @@ openssl dgst -sha3-256 tetherand.apk</code></pre>
 <ul>
   <li><a href="privacy-chain.html">Privacy chain</a> &mdash; add WireGuard, Tor, Nym, Mullvad.</li>
   <li><a href="threat-detection.html">Threat detection</a> &mdash; what the alerts mean.</li>
-  <li><a href="hardened-mode.html">Hardened Mode</a> &mdash; one-tap DEFCON lockdown.</li>
+  <li><a href="hardened-mode.html">Hardened Mode</a> &mdash; one-tap 5364C13D lockdown.</li>
   <li><a href="cli.html">CLI reference</a> &mdash; every <code>tetherand</code> subcommand.</li>
 </ul>
 
@@ -136,7 +136,7 @@ openssl dgst -sha3-256 tetherand.apk</code></pre>
     </div>
     <footer class="site-footer">
       <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
-      <div>Built for DEFCON 34 · 2026</div>
+      <div>Built for 5364C13D 34 · 2026</div>
     </footer>
   </main>
 </div>

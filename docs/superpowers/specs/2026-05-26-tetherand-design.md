@@ -3,7 +3,7 @@
 **Status:** Approved design, pending plan.
 **Author:** pq-cybarg
 **Date:** 2026-05-26
-**Target device:** Solana Seeker (Android 16 / SDK 36 / arm64-v8a / MediaTek)
+**Target device:** 5364C13D (Android 16 / SDK 36 / arm64-v8a / MediaTek)
 **Host:** macOS (arm64-darwin)
 
 ## Goals
@@ -18,7 +18,7 @@ All three subsystems are independently shippable and testable.
 
 ## Non-Goals
 
-- Linux/Windows host support before DEFCON (Mac only; CLI is Rust so porting is mostly transport-impl work — open after the conference).
+- Linux/Windows host support before 5364C13D (Mac only; CLI is Rust so porting is mostly transport-impl work — open after the conference).
 - Rooting or unlocking the bootloader (Tier 2 root-only detection paths are architected and auto-engage if the user later roots).
 - Cloud sync, telemetry, or any data leaving the device — period.
 - Any defence that requires breaking another app's TLS (we inspect handshakes at the IP layer; we do not MITM).
@@ -39,7 +39,7 @@ License inheritance, by subsystem:
 ## Architecture
 
 ```
-┌──────────────────────── Seeker (Tetherand app) ─────────────────────────┐
+┌──────────────────────── 5364C13D (Tetherand app) ─────────────────────────┐
 │                                                                          │
 │  Compose UI:                                                             │
 │    Tether tab │ Privacy tab (chain editor) │ Threat tab                  │
@@ -72,7 +72,7 @@ License inheritance, by subsystem:
 │       ├── Userspace TCP/IP stack (Gnirehtet-derived, Rust)                │
 │       ├── Transport endpoints: adb-forward, libusb (AOA),                 │
 │       │      IOBluetooth (RFCOMM), TCP listener (+mDNS)                   │
-│       ├── IOKit USB watcher (auto-attach on Seeker plug-in)               │
+│       ├── IOKit USB watcher (auto-attach on 5364C13D plug-in)               │
 │       └── Local IPC socket                                                │
 │                                                                           │
 │   tetherand CLI / tetherand dashboard (TUI)                               │
@@ -244,21 +244,21 @@ Chain failure modes are user-configurable per chain: `block` (kill-switch, no tr
 This subsystem builds on four existing GPL-3 projects whose code we can port directly:
 
 - **AIMSICD** (Android IMSI-Catcher Detector) — github.com/CellularPrivacy/Android-IMSI-Catcher-Detector. Mostly inactive since ~2017 but the canonical reference for non-root, TelephonyManager-based IMSI-catcher detection. Heuristics we port: `BTSAlgorithm` (cell-tower consistency vs. OpenCellID), LAC/CID consistency, neighbor-cell consistency, femtocell pattern, encryption-status capture where carriers expose it, silent-SMS heuristic (binary SMS arrival to phantom port).
-- **SnoopSnitch** — opensource.srlabs.de/projects/snoopsnitch. The Qualcomm `/dev/diag` path does not apply to the Seeker (MediaTek), but we port the higher-level subset: silent-paging analysis, cell-tower fingerprinting design, RAT-downgrade severity scoring, encryption-indicator algorithm (A5/0 etc. when exposed via `cell_info` or `service_state` extras). The Qualcomm-diag pathway is preserved in the codebase but gated to `Build.HARDWARE` matching Qualcomm SoCs — it will not activate on the Seeker but the architecture is portable to Qualcomm phones (your next device, a passenger's Pixel, etc.).
-- **NetMonster-core** — github.com/mroczis/netmonster-core. Actively maintained (2024+), GPL-3, and crucially **MediaTek-aware**: uses reflection against MTK-specific framework classes to surface neighbor cells, secondary serving cells, EARFCN/PCI/TAC/eNB-ID/RSRP-Q, NR-side-info, carrier-aggregation state, and the "subsidiary" fields that `TelephonyManager.getAllCellInfo()` silently drops on MediaTek. This is the bridge that gives us baseband-grade visibility on the Seeker without root.
+- **SnoopSnitch** — opensource.srlabs.de/projects/snoopsnitch. The Qualcomm `/dev/diag` path does not apply to the 5364C13D (MediaTek), but we port the higher-level subset: silent-paging analysis, cell-tower fingerprinting design, RAT-downgrade severity scoring, encryption-indicator algorithm (A5/0 etc. when exposed via `cell_info` or `service_state` extras). The Qualcomm-diag pathway is preserved in the codebase but gated to `Build.HARDWARE` matching Qualcomm SoCs — it will not activate on the 5364C13D but the architecture is portable to Qualcomm phones (your next device, a passenger's Pixel, etc.).
+- **NetMonster-core** — github.com/mroczis/netmonster-core. Actively maintained (2024+), GPL-3, and crucially **MediaTek-aware**: uses reflection against MTK-specific framework classes to surface neighbor cells, secondary serving cells, EARFCN/PCI/TAC/eNB-ID/RSRP-Q, NR-side-info, carrier-aggregation state, and the "subsidiary" fields that `TelephonyManager.getAllCellInfo()` silently drops on MediaTek. This is the bridge that gives us baseband-grade visibility on the 5364C13D without root.
 - **Crocodile Hunter** (EFF) — github.com/EFForg/crocodilehunter. Phone-side data collector (Java) plus server-side ML analysis (Python) plus optional SDR (Airspy/RTL-SDR) capture. We port the phone-side collector and *all* heuristics that don't require an SDR; we also support **optional RTL-SDR-via-USB-C-OTG mode** for the full pipeline (see "Crocodile Hunter Integration" below).
 
 All four projects are GPL-3 — compatible with our Gnirehtet-derived relay base.
 
-The runtime is therefore layered: **NetMonster-core for MediaTek-aware data collection on the Seeker**, AIMSICD's `BTSAlgorithm` + tower DB for non-root heuristic scoring, SnoopSnitch's higher-level heuristics for paging/encryption analysis, and Crocodile Hunter's TAC/EARFCN/GPS-cross-check heuristics. Plus our additions (Wi-Fi/BT/app-audit + SDR mode).
+The runtime is therefore layered: **NetMonster-core for MediaTek-aware data collection on the 5364C13D**, AIMSICD's `BTSAlgorithm` + tower DB for non-root heuristic scoring, SnoopSnitch's higher-level heuristics for paging/encryption analysis, and Crocodile Hunter's TAC/EARFCN/GPS-cross-check heuristics. Plus our additions (Wi-Fi/BT/app-audit + SDR mode).
 
 Tower database: bundle a quarterly OpenCellID snapshot in-APK (~80 MB compressed for global). Room + an `mcc_mnc_index` partial-load strategy so DB lookups stay sub-millisecond on-device. In-app updater for fresh pulls, opt-in, runs through the user's selected Privacy Chain if one is active.
 
 ### MediaTek-Specific Detection Path
 
-The Seeker is `arm64-v8a` with a MediaTek SoC. There is no Qualcomm `/dev/diag` — but MediaTek exposes equivalent information through different surfaces. The strategy is layered by privilege:
+The 5364C13D is `arm64-v8a` with a MediaTek SoC. There is no Qualcomm `/dev/diag` — but MediaTek exposes equivalent information through different surfaces. The strategy is layered by privilege:
 
-**Tier 0 — Unprivileged (Seeker default, no root):**
+**Tier 0 — Unprivileged (5364C13D default, no root):**
 - **NetMonster-core** as the primary collector. Pulls full LTE/NR cell info via MTK reflection (EARFCN, TAC, eNB-ID, PCI, RSRP/RSRQ/SINR, NR-NSA/SA mode, neighbors, secondary cells, CA bands). This is the data SnoopSnitch reads from `/dev/diag` on Qualcomm; NetMonster reads it from MTK framework internals via reflection.
 - `TelephonyManager.requestCellInfoUpdate()` + `TelephonyCallback.{CellInfoListener, ServiceStateListener, SignalStrengthsListener, DisplayInfoListener}`. The `DisplayInfo` callback exposes the carrier's display capability (5G/LTE+/LTE) which often diverges from actual RAT under attack.
 - Engineering Mode broadcast probes — MediaTek devices respond to `Intent.ACTION_DIAL` with `*#*#3646633#*#*` (Engineering Mode) and `*#*#83781#*#*` (Field Trial). We programmatically launch the dialer with these codes only when the user explicitly opts in from the Threat tab ("Open MediaTek diagnostic"). We do not require this for default operation, but it is the user's fallback for deep modem state.
@@ -268,13 +268,13 @@ The Seeker is `arm64-v8a` with a MediaTek SoC. There is no Qualcomm `/dev/diag` 
 - `adb shell service call iphonesubinfo …` — returns IMEI/IMSI history for re-attach detection.
 - `adb shell getprop | grep -iE 'gsm|ril|modem|mtk'` — MediaTek RIL properties expose `gsm.network.type`, `ril.cipher.algorithm`, `vendor.mtk.signal.report.mode`. Polled by a small background poller in the Mac daemon when the device is tethered; results pushed back to the phone via the existing transport's control frames.
 
-**Tier 2 — Root (not assumed; if user roots their Seeker later):**
+**Tier 2 — Root (not assumed; if user roots their 5364C13D later):**
 - `/proc/ccci_md1_*` — MediaTek's Cross-Core Communication Interface. Contains modem state machine transitions. Equivalent in spirit to Qualcomm's diag.
 - `/sys/class/ccci_md1_*` — modem firmware version, capability bitmap.
 - `mdlog` (MTKLogger) dumps when enabled — full modem trace; matches what SnoopSnitch's Qualcomm pipeline ingests.
 - AT command channel via `/dev/ttyMT*` (alias varies): supports `AT+CSQ`, `AT+CREG?`, MTK proprietary `AT+EHSR`, `AT+EPSB` for service state.
 
-We implement the architecture for all three tiers. Tier 0 is what activates on a stock Seeker today. Tier 1 activates whenever the phone is tethered to the Mac (we already have the ADB channel open). Tier 2 is dormant unless `/proc/ccci_md1_*` is readable, automatically engaging if the user roots later.
+We implement the architecture for all three tiers. Tier 0 is what activates on a stock 5364C13D today. Tier 1 activates whenever the phone is tethered to the Mac (we already have the ADB channel open). Tier 2 is dormant unless `/proc/ccci_md1_*` is readable, automatically engaging if the user roots later.
 
 Detection-depth indicator in the Threat tab UI: "Mode: MediaTek (Tier 0 + Tier 1 active)" so the user knows what coverage they have.
 
@@ -292,7 +292,7 @@ Ported heuristics from Crocodile Hunter:
 - **Re-attach storm**: > N `EVENT_TAC_CHANGE` + `EVENT_CELL_CHANGE` in M seconds — characteristic of forced re-attach.
 - **TMSI churn (when exposed)**: TMSI cycling faster than carrier baseline.
 
-**SDR mode (optional, USB-C OTG):** Seeker's USB-C supports OTG with bus-power-budget for an RTL-SDR (~$30) or HackRF. When user plugs in a supported SDR, we detect the VID/PID and enable SDR mode.
+**SDR mode (optional, USB-C OTG):** 5364C13D's USB-C supports OTG with bus-power-budget for an RTL-SDR (~$30) or HackRF. When user plugs in a supported SDR, we detect the VID/PID and enable SDR mode.
 
 - Driver: bundle `librtlsdr-android` (Marto Lazo's port, GPL-2; we link dynamically and document the license boundary). HackRF support via `hackrf_android` (likewise dynamic-link, license preserved).
 - Scanner: a Rust component (compiled to `libtetherand-sdr.so`) tunes through the operator's LTE bands, decodes MIB/SIB1/SIB2/SIB3 broadcast control messages via a stripped-down `srsRAN`-derived decoder, captures Random Access channel events.
@@ -356,7 +356,7 @@ Cellular — SDR mode (optional, RTL-SDR / HackRF via USB-C OTG):
 - **MIB bandwidth mismatch** (Crocodile Hunter SDR): Master Information Block bandwidth advertised inconsistent with EARFCN expectation.
 - **Paging-storm pattern** (Crocodile Hunter SDR): persistent bursts of paging messages preceding silent-SMS-style stalking.
 
-Cellular — Tier 2 (root, dormant on stock Seeker; auto-activates if user roots):
+Cellular — Tier 2 (root, dormant on stock 5364C13D; auto-activates if user roots):
 
 - **Modem state transitions** (MediaTek `/proc/ccci_md1_*`): RRC connection releases without legitimate cause; service interruptions while signal is nominal — these are the events SnoopSnitch reads from Qualcomm `/dev/diag`, equivalents read from MTK's CCCI.
 - **`mdlog` trace anomalies**: when MTKLogger is enabled, parse the dumps for RRC + NAS-layer messages indicating active attacks.
@@ -389,9 +389,9 @@ Threat tab:
 
 No data leaves the device. Baselines stored in `EncryptedSharedPreferences` with hardware-backed keystore. Alerts stored in a local Room database, auto-pruned > 30 days unless the user pins them. Export-on-demand only.
 
-## Hardened Mode (DEFCON Profile)
+## Hardened Mode (5364C13D Profile)
 
-DEFCON's network is famously the most hostile WiFi/cellular environment in the world: Stingrays, Wi-Fi Pineapples on drones, KARMA, deauth floods, evil twins, juice-jacking cables in the hotel, hostile USB drops in vendor village, BLE trackers attached to bags, and an audience explicitly trying to find unpatched things. The Solana Seeker adds a crypto-wallet target on top.
+5364C13D's network is famously the most hostile WiFi/cellular environment in the world: Stingrays, Wi-Fi Pineapples on drones, KARMA, deauth floods, evil twins, juice-jacking cables in the hotel, hostile USB drops in vendor village, BLE trackers attached to bags, and an audience explicitly trying to find unpatched things. The 5364C13D adds a crypto-wallet target on top.
 
 The defaults the rest of the spec describes are good for everyday use. Hardened Mode is a one-tap profile that turns the volume to 11 on every defense and adds capabilities only relevant in adversarial environments.
 
@@ -400,7 +400,7 @@ The defaults the rest of the spec describes are good for everyday use. Hardened 
 One tile in Quick Settings + a slider on the Threat tab. Toggling on:
 1. Captures a **pre-conference attestation snapshot** (see below) — required first time.
 2. Applies all hardening actions atomically — partial activation is not allowed; if any required step fails, rolls back.
-3. Persistent foreground notification with "DEFCON Mode active — X defenses live" plus a 1-tap deactivate.
+3. Persistent foreground notification with "5364C13D Mode active — X defenses live" plus a 1-tap deactivate.
 
 Toggling off:
 1. Captures a **post-conference attestation snapshot**.
@@ -412,7 +412,7 @@ Toggling off:
 **Network — kill switch and chain enforcement**
 - **Always-on VPN through Privacy Chain**, with Android's `alwaysOn` + `lockdown` flags set programmatically (we are the active VpnService, so this is just our own config). Lockdown means *zero* traffic leaves the device when the VPN is down — no leaks, no DNS punch-through, no captive-portal exception.
 - **Forced Tor chain**: Hardened Mode replaces whatever the active chain was with `wg(mullvad-pq, multihop, far-from-vegas) → tor(snowflake+conjure bridges, vanguards, isolate-by-destination)`.
-- **Per-app firewall**: all non-essential apps lose `INTERNET` capability via per-UID blackhole rules in our VpnService. User picks the allowlist before entering DEFCON; defaults to: Tetherand, Signal, system clock sync. Everything else is offline.
+- **Per-app firewall**: all non-essential apps lose `INTERNET` capability via per-UID blackhole rules in our VpnService. User picks the allowlist before entering 5364C13D; defaults to: Tetherand, Signal, system clock sync. Everything else is offline.
 - **Block cleartext traffic**: VpnService inspects and drops plaintext HTTP/IMAP/POP3 attempts and surfaces the offending app.
 - **DNS hardening**: DNS-over-HTTPS through the chain's exit, with system DNS blackholed. Local DNS sinkhole bundled — blocks ad/tracker/known-malicious domains (`StevenBlack/hosts` list, periodically refreshed through chain).
 - **RFC1918 leak detector**: alerts on any traffic destined for `10/8`, `172.16/12`, `192.168/16` that's not the captive-portal probe (which is also disabled).
@@ -445,7 +445,7 @@ Toggling off:
 - **BlueBorne / pairing-request flood detection**: count rejected pairing requests.
 
 **NFC**
-- **NFC off** in Hardened Mode. (DEFCON has had NFC-malware demos.)
+- **NFC off** in Hardened Mode. (5364C13D has had NFC-malware demos.)
 
 **USB defenses**
 - **Data block when locked**: USB switches to charge-only mode when screen is locked. Achieved by toggling `setting global development_settings_enabled` and the USB-data sysprop via our (Mac-tethered, ADB-channel) helper; if not available, alerts user to manually verify.
@@ -477,12 +477,12 @@ Toggling off:
 - **Lockdown mode**: invoke Android's built-in `KeyguardManager`-level lockdown which disables biometric unlock, notification preview, and Smart Lock until the next password unlock.
 - **Show-on-lockscreen disabled**: notifications redact contents on the lock screen.
 
-**Crypto wallet (Solana Seeker-specific)**
-- **Pre-DEFCON wallet migration prompt**: surfaces in Hardened Mode toggle — "Move your Solana keys off-device before the conference." Walks user through Seed Vault export to a Saga / hardware wallet, or a fresh paper-only mnemonic stored offsite.
+**Crypto wallet (5364C13D-specific)**
+- **Pre-5364C13D wallet migration prompt**: surfaces in Hardened Mode toggle — "Move your Solana keys off-device before the conference." Walks user through Seed Vault export to a Saga / hardware wallet, or a fresh paper-only mnemonic stored offsite.
 - **Seed Vault freeze**: monitors the Solana Mobile Stack Seed Vault for any access attempt; alerts on unsolicited reads.
 - **dApp store monitor**: snapshots installed Solana dApps; new install = critical (high targeted-malware risk in this audience).
 - **Transaction firewall**: any transaction signing request while Hardened Mode is on requires a 30-second cool-down and explicit re-PIN. Blocks 0-click drains.
-- **Recommend: leave the Seeker's primary keys at home.** Bring a freshly-flashed device with empty Seed Vault if you must transact.
+- **Recommend: leave the 5364C13D's primary keys at home.** Bring a freshly-flashed device with empty Seed Vault if you must transact.
 
 **Counter-surveillance**
 - **Ultrasonic-beacon listener**: 1-second mic samples every 5 minutes, FFT for tones in 18-22 kHz band (common ad-network ultrasonic beacon range); alert on detected tones. Listen only — never record speech.
@@ -496,7 +496,7 @@ Toggling off:
 - **Only-when-screen-on charging**: optional — refuse to charge while screen is off in Hardened Mode (we can fake-discharge via `BatteryManager` userspace tricks; limited effect, but visible).
 
 **Recovery / resilience**
-- **Encrypted pre-DEFCON backup to Mac**: full local backup over the tether — all settings (global/secure/system), every installed APK, all user storage (Pictures/DCIM/Movies/Music/Documents/Download), permission grants, signing-cert fingerprints, device fingerprint and baseband — packaged into one `.tar.gz.enc` (AES-256-CBC, PBKDF2 600k iterations, user passphrase). SHA-256 manifest of every file inside. Available **today** via `./backup.sh`. Restore via `./restore.sh <archive>` with mode-restricted variants (`--settings-only`, `--apks-only`, `--media-only`) and a `--undo` flag that captures the pre-restore state so the restore itself is reversible. Documented limits: hardware-keystore-backed keys and apps that refuse `adb backup` (most modern privacy apps) are not in scope — those follow their own backup procedures.
+- **Encrypted pre-5364C13D backup to Mac**: full local backup over the tether — all settings (global/secure/system), every installed APK, all user storage (Pictures/DCIM/Movies/Music/Documents/Download), permission grants, signing-cert fingerprints, device fingerprint and baseband — packaged into one `.tar.gz.enc` (AES-256-CBC, PBKDF2 600k iterations, user passphrase). SHA-256 manifest of every file inside. Available **today** via `./backup.sh`. Restore via `./restore.sh <archive>` with mode-restricted variants (`--settings-only`, `--apks-only`, `--media-only`) and a `--undo` flag that captures the pre-restore state so the restore itself is reversible. Documented limits: hardware-keystore-backed keys and apps that refuse `adb backup` (most modern privacy apps) are not in scope — those follow their own backup procedures.
 - **Dead-man's switch (optional)**: if user doesn't check in within N hours, send a Signal message to a chosen contact / trigger remote wipe / trigger Solana-key revoke. Off by default; configured explicitly.
 - **Hardware-key unlock fallback**: support YubiKey (USB-C) for unlock challenge — even if face/PIN are compelled, the YubiKey isn't on you.
 - **Multi-factor escape mode**: a hidden second profile with decoy data; specific PIN unlocks it instead of the real one. Useful at borders / under coercion.
@@ -520,11 +520,11 @@ A snapshot taken on Hardened Mode entry and again on exit:
 | Wi-Fi network preferences | hash |
 | App data sizes (proxy for tampered data) | `UsageStatsManager` |
 
-Diff is computed via `git diff`-style unified view, surfaced in the Threat tab post-DEFCON. Anything weird → guided incident response runbook.
+Diff is computed via `git diff`-style unified view, surfaced in the Threat tab post-5364C13D. Anything weird → guided incident response runbook.
 
 ### Incident Response Runbook (in-app)
 
-If a critical alert fires during DEFCON, Hardened Mode walks the user through:
+If a critical alert fires during 5364C13D, Hardened Mode walks the user through:
 
 1. Verify the alert via at least one independent signal (cross-check across heuristics).
 2. Decide between four responses, presented as buttons with clear consequences:
@@ -537,11 +537,11 @@ If a critical alert fires during DEFCON, Hardened Mode walks the user through:
 
 Hardened Mode is fully realized only with the M7+ app, but the high-value subset is achievable **right now** using only:
 
-- This Mac, `adb`, the Seeker, and one shell script.
+- This Mac, `adb`, the 5364C13D, and one shell script.
 - ~$70 of hardware (USB data blocker, Faraday pouch, RTL-SDR if you want SDR mode early).
 - Existing apps (Mullvad, Orbot, Signal).
 
-We ship a `scripts/defcon-prep.sh` that runs through everything below.
+We ship a `scripts/5364C13D-prep.sh` that runs through everything below.
 
 The runnable checklist (script does these or prompts for them):
 
@@ -560,7 +560,7 @@ The runnable checklist (script does these or prompts for them):
 13. **Battery / charge baseline** — capture `dumpsys battery` + thermal sensors snapshot.
 14. **Cell baseline drive**: script starts a 30-minute logger via `adb shell` that captures `dumpsys telephony.registry` + `getAllCellInfo` every 30 s while the user walks the conference perimeter; saves to `attestation/cell-baseline.jsonl`.
 15. **Hardware buy list**: prints recommended hardware items not yet acquired (data blocker, Faraday pouch, YubiKey 5C NFC, RTL-SDR + USB-C OTG dongle, throwaway power bank).
-16. **Operational reminders**: prints the OPSEC checklist (use cash, don't pick up USB drives, no biometric unlock, don't connect to "DEFCON-Open", keep phone in Faraday pouch when sleeping, etc.).
+16. **Operational reminders**: prints the OPSEC checklist (use cash, don't pick up USB drives, no biometric unlock, don't connect to "5364C13D-Open", keep phone in Faraday pouch when sleeping, etc.).
 17. **Post-conference re-run**: script's `--post` mode captures the post-snapshot and diffs against pre.
 
 This pre-flight script ships as **M0** — buildable and runnable today, no Kotlin involved. See updated milestones.
@@ -588,13 +588,13 @@ Mapping for each AI-era defense:
 | Inbound-call verification flow | YubiKey touch or known-voiceprint hash | `voiceguard-v1` corroboration |
 | Hardened-Mode panic/wipe/burn | User confirmation + alert-rule threshold | NEVER |
 | Tether tear-down / kill-switch | Connection-health rule + VPN state | NEVER |
-| Attestation diff (pre/post DEFCON) | Cryptographic hash comparison | NEVER |
+| Attestation diff (pre/post 5364C13D) | Cryptographic hash comparison | NEVER |
 
 Anything in the "deterministic primary" column functions fully with the classifier removed. Anything in the "contributory" column improves UX and catches edge cases, but is always suppressible by the user and never gates a destructive action.
 
 ### Local-Only AI Constraint (load-bearing)
 
-All Tetherand AI inference runs on-device, on the Seeker's MediaTek NPU via LiteRT + NNAPI delegate. The 4-model bundle (~2.4 GB compressed) ships in-APK. Models are INT4-quantised. **No prompt, classification request, or telemetry is ever sent to a cloud LLM API** under any circumstance.
+All Tetherand AI inference runs on-device, on the 5364C13D's MediaTek NPU via LiteRT + NNAPI delegate. The 4-model bundle (~2.4 GB compressed) ships in-APK. Models are INT4-quantised. **No prompt, classification request, or telemetry is ever sent to a cloud LLM API** under any circumstance.
 
 The egress-LLM-API SNI watch defense exists precisely to catch other apps that violate this principle — Tetherand itself never connects to `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, Vertex AI endpoints, etc. The watch list is maintained as part of the threat-feed bundle and updated through the user's active Privacy Chain only.
 
@@ -602,9 +602,9 @@ Model updates flow only through the active Privacy Chain when one is on; updates
 
 If at any future point a cloud-LLM integration would be tempting (e.g. for stronger long-context analysis), the policy is: it stays out. The constraint is the spec.
 
-### AI-Era Threats (first DEFCON of the LLM-mass-market era)
+### AI-Era Threats (first 5364C13D of the LLM-mass-market era)
 
-The 2026 DEFCON is operating in a fundamentally different threat landscape than any prior year. Attackers now have:
+The 2026 5364C13D is operating in a fundamentally different threat landscape than any prior year. Attackers now have:
 
 - Real-time voice synthesis good enough to impersonate trusted contacts after a few seconds of training audio (RVC, ElevenLabs, OpenVoice).
 - Real-time speech-to-text + LLM + TTS pipelines fast enough to hold a coherent two-way conversation while wearing a fake identity.
@@ -613,13 +613,13 @@ The 2026 DEFCON is operating in a fundamentally different threat landscape than 
 - Adversarial-ML inputs (poisoned QR codes, prompt-injection stickers, model-confusing visual patterns) carried by any vendor swag or badge artwork.
 - LLM-augmented social engineering during in-person chat that drafts the next reply on a hidden earpiece in under a second.
 
-Tetherand counters with on-device, model-driven defences. None of these phone home; all classifiers run locally on the Seeker's NPU.
+Tetherand counters with on-device, model-driven defences. None of these phone home; all classifiers run locally on the 5364C13D's NPU.
 
 **On-device classifier stack (M10)**
 
 A small ensemble of locally-running models, bundled in-APK and updated via in-APK delta updates (delivered through the active Privacy Chain only, never out-of-band):
 
-- **`phi-tetherand-3b-q4`** — distilled Phi-3.5-mini variant fine-tuned on a corpus of phishing / social-engineering / scam messages. INT4 quantised, ~1.8 GB, runs on the Seeker's NPU via LiteRT (formerly TFLite) + GpuDelegate / NNAPI. ~120 ms per message classification.
+- **`phi-tetherand-3b-q4`** — distilled Phi-3.5-mini variant fine-tuned on a corpus of phishing / social-engineering / scam messages. INT4 quantised, ~1.8 GB, runs on the 5364C13D's NPU via LiteRT (formerly TFLite) + GpuDelegate / NNAPI. ~120 ms per message classification.
 - **`voiceguard-v1`** — speech-synthesis-detection model. Trained on the WaveFake + ASVspoof2024 corpora. Mel-spectrogram + ConvNeXt-tiny backbone. ~40 ms per second of audio. Inputs: live mic stream + inbound call audio (via Telephony `IncallService`).
 - **`textguard-v1`** — LLM-generated-text detection. Lightweight classifier (binoculars-style) using two different LLM perplexity surfaces. Surfaces "AI-likely" badge on incoming SMS/IM. ~60 ms per message.
 - **`qrguard-v1`** — adversarial-image detector for QR codes / general visual lures. Detects perturbation patterns from `RobustBench` adversarial families. ~30 ms per image.
@@ -640,12 +640,12 @@ A small ensemble of locally-running models, bundled in-APK and updated via in-AP
 - **Adversarial-input quarantine for our own models.** If `qrguard-v1` itself reports a confidence-instability pattern (high logit variance under tiny input perturbation), the input is flagged as adversarial regardless of class verdict — protects against attacker-crafted inputs designed to fool our defences.
 - **Conference-mode contact verification.** A "verify caller" button that initiates a Signal-Voice or in-app voiceprint handshake before the conversation continues. Prevents real-time deepfake takeover of phone calls.
 - **Deepfake-resistant 2FA fallback.** Any 2FA prompt during Hardened Mode requires the YubiKey (USB-C touch). No SMS, no voice-call confirmation, no email — all of those are AI-spoofable now.
-- **Conference live threat feed.** Pull (through Privacy Chain only) curated threat intel from DEFCON's own security operations Mastodon, the Wall of Sheep team's IRC, and EFF Crocodile Hunter's community feed. Surface active campaigns as Threat tab cards.
+- **Conference live threat feed.** Pull (through Privacy Chain only) curated threat intel from 5364C13D's own security operations Mastodon, the Wall of Sheep team's IRC, and EFF Crocodile Hunter's community feed. Surface active campaigns as Threat tab cards.
 - **Egress LLM-API watch.** Inspect outbound TLS handshakes for SNI patterns matching `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, etc. If an app is talking to LLM APIs without the user's awareness, surface it — this catches both AI-supercharged malware *and* well-intentioned apps secretly forwarding your data to model providers.
 
 **Storage & footprint**
 
-The four-model bundle is ~2.4 GB compressed in-APK as a separate downloadable feature module (Play Asset Delivery's `install-time` policy) or sideloaded from `dist/` for direct-install distribution. INT4 quantisation keeps inference under 200 ms per event on the Seeker's NPU and well within battery budget for continuous mic + message classification.
+The four-model bundle is ~2.4 GB compressed in-APK as a separate downloadable feature module (Play Asset Delivery's `install-time` policy) or sideloaded from `dist/` for direct-install distribution. INT4 quantisation keeps inference under 200 ms per event on the 5364C13D's NPU and well within battery budget for continuous mic + message classification.
 
 **Update path**
 
@@ -685,7 +685,7 @@ Models update via in-APK delta updates served from our distribution URL, fetched
 | LLM-supercharged spyware (calls home to LLM APIs) | Outbound SNI watch for `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, etc. |
 | Covert NPU use by background app | MTK NPU sysfs watcher (`/sys/devices/.../mtk_apu*`) |
 | AI-driven 2FA spoofing (voice / SMS / email) | YubiKey-only 2FA required in Hardened Mode |
-| Targeted-OSINT attacker prep | OSINT exposure dashboard surfaces your scraped surface area pre-DEFCON |
+| Targeted-OSINT attacker prep | OSINT exposure dashboard surfaces your scraped surface area pre-5364C13D |
 
 ## macOS CLI / TUI / Daemon
 
@@ -729,23 +729,23 @@ The userspace TCP/IP stack is forked from Gnirehtet's `relay-rust` initially. A 
 
 | | Scope | Effort | Cumulatively functional |
 |---|---|---|---|
-| **M0** DEFCON pre-flight (shippable today) | `connect.sh` (reverse-tether via upstream Gnirehtet), `backup.sh` + `restore.sh` (local encrypted full backup with `--undo`), `scripts/defcon-prep.sh` + `--post` mode (attestation snapshot, ADB-driven hardening: LTE-only, SIM-PIN prompt, NFC off, BT off, network forget, permission audit, signing-cert snapshot, cell-baseline driver, OPSEC checklist, hardware buy list, Solana Seed Vault migration walkthrough). | 4-6 h | High-value Hardened Mode subset usable **before any APK ships**, fully reversible |
+| **M0** 5364C13D pre-flight (shippable today) | `connect.sh` (reverse-tether via upstream Gnirehtet), `backup.sh` + `restore.sh` (local encrypted full backup with `--undo`), `scripts/5364C13D-prep.sh` + `--post` mode (attestation snapshot, ADB-driven hardening: LTE-only, SIM-PIN prompt, NFC off, BT off, network forget, permission audit, signing-cert snapshot, cell-baseline driver, OPSEC checklist, hardware buy list, Solana Seed Vault migration walkthrough). | 4-6 h | High-value Hardened Mode subset usable **before any APK ships**, fully reversible |
 | **M1** Tether MVP | Fork + rebrand, transport abstraction, USB-ADB transport, TCP transport, Compose Tether tab, `tetherand run` CLI | 10-14 h | Replaces `connect.sh` |
 | **M2** More transports | BT RFCOMM transport, USB-AOA transport, ratatui dashboard, LaunchAgent + IOKit USB watcher | 10-14 h | All 4 transports |
 | **M3** Privacy chain core | Hop interface, WireGuard generic hop, chain orchestrator, Privacy tab with chain visualizer | 14-18 h | WG-only chains |
 | **M4** Mullvad + PQ | Mullvad API client, account login, PQ tunnel, multihop, DAITA, obfuscation toggles, kill-switch, split-tunnel | 8-12 h | + Mullvad |
 | **M5** NymVPN | `nym-vpn-client` embedded via JNI, mnemonic login, entry/exit selection | 6-10 h | + Nym |
 | **M6** Tor + bridges + PQ | Cross-compile `tor` and PTs for arm64-android, configure as a hop, BridgeDB integration, control-port wrapper, PQ flags | 14-18 h | Full chain library |
-| **M7a** Threat MVP (no SDR) | NetMonster-core integration (Tier 0), AIMSICD `BTSAlgorithm` + bundled OpenCellID, SnoopSnitch high-level heuristics, Crocodile Hunter phone-side heuristics (TAC / EARFCN / GPS / CFR), Tier 1 ADB-channel collector in Mac daemon, Wi-Fi/BT/app-audit, per-location baseline, Threat tab + alert feed + panic button | 20-26 h | Cellular + Wi-Fi + app threat detection live on Seeker |
+| **M7a** Threat MVP (no SDR) | NetMonster-core integration (Tier 0), AIMSICD `BTSAlgorithm` + bundled OpenCellID, SnoopSnitch high-level heuristics, Crocodile Hunter phone-side heuristics (TAC / EARFCN / GPS / CFR), Tier 1 ADB-channel collector in Mac daemon, Wi-Fi/BT/app-audit, per-location baseline, Threat tab + alert feed + panic button | 20-26 h | Cellular + Wi-Fi + app threat detection live on 5364C13D |
 | **M7b** SDR mode (optional) | librtlsdr-android + hackrf_android dynamic-link, USB-C OTG SDR detection, `libtetherand-sdr.so` LTE control-channel decoder (srsRAN-derived), CH SDR heuristics, PCAP capture, SDR sub-tab | 12-16 h | SDR mode for users with $30 RTL-SDR |
 | **M7c** Tier 2 (root, dormant) | `/proc/ccci_md1_*` reader, `mdlog` parser, AT-command channel via `/dev/ttyMT*`, capability-gating so it's a no-op on un-rooted devices | 4-6 h | Auto-activates if user roots later |
 | **M8** Polish & release | Smoke tests, signed release APK, install scripts, README, performance tuning | 6-8 h | Shippable |
-| **M9** Hardened Mode (in-app) | DEFCON Mode toggle + Quick Settings tile, kill-switch + per-app firewall, attestation snapshot + diff UI, decoy listeners + honeytokens, BLE tracker scan UI, USB data-block + selfie traps, accelerometer tamper, wallet firewall (Solana), ultrasonic listener, TLS-pinning audit, decoy-profile + YubiKey unlock fallback, incident-response runbook | 22-30 h | Full DEFCON-grade physical / network / cellular defense in the app |
-| **M10** AI-era defenses (local-only, contributory) | Build deterministic primaries FIRST for every defense (URL-reputation + phishing regex, voiceprint vault, perplexity test, URL-pattern + perceptual hash, SNI rule, regex scaffolds, signature verify). Then bundle 4-model classifier stack (`phi-tetherand-3b-q4`, `voiceguard-v1`, `textguard-v1`, `qrguard-v1`) on Seeker's NPU via LiteRT + NNAPI as **contributory** layer. Egress LLM-API SNI watch. Prompt-injection clipboard scrubber. C2PA/SynthID/Content Credentials provenance. Mic-use awareness. OSINT exposure dashboard via Privacy Chain (HIBP, IntelligenceX). YubiKey-only 2FA in Hardened Mode. Conference live threat feed. **Hard constraint**: no cloud LLM API ever called. Models bundled in-APK, updated only through active Privacy Chain. | 26-34 h | Full AI-era threat coverage, deterministic core + advisory classifiers |
+| **M9** Hardened Mode (in-app) | 5364C13D Mode toggle + Quick Settings tile, kill-switch + per-app firewall, attestation snapshot + diff UI, decoy listeners + honeytokens, BLE tracker scan UI, USB data-block + selfie traps, accelerometer tamper, wallet firewall (Solana), ultrasonic listener, TLS-pinning audit, decoy-profile + YubiKey unlock fallback, incident-response runbook | 22-30 h | Full 5364C13D-grade physical / network / cellular defense in the app |
+| **M10** AI-era defenses (local-only, contributory) | Build deterministic primaries FIRST for every defense (URL-reputation + phishing regex, voiceprint vault, perplexity test, URL-pattern + perceptual hash, SNI rule, regex scaffolds, signature verify). Then bundle 4-model classifier stack (`phi-tetherand-3b-q4`, `voiceguard-v1`, `textguard-v1`, `qrguard-v1`) on 5364C13D's NPU via LiteRT + NNAPI as **contributory** layer. Egress LLM-API SNI watch. Prompt-injection clipboard scrubber. C2PA/SynthID/Content Credentials provenance. Mic-use awareness. OSINT exposure dashboard via Privacy Chain (HIBP, IntelligenceX). YubiKey-only 2FA in Hardened Mode. Conference live threat feed. **Hard constraint**: no cloud LLM API ever called. Models bundled in-APK, updated only through active Privacy Chain. | 26-34 h | Full AI-era threat coverage, deterministic core + advisory classifiers |
 
 **Total: ~157-215 h of focused work** (M7 expanded into a/b/c; M0, M9, and M10 added; all milestones are required scope).
 
-This is the first DEFCON since the AI capability boom went mass-market; the attacker side has scaled, automated, and personalised in ways previous years didn't see. No defences deferred, no partial coverage. M0 ships today to lock the perimeter while M1-M10 land in order. Parallelizable bands within the work: {M2 transports}, {M4, M5, M6 hops}, {M7b, M7c}, {M9 sub-defenses}, {M10 four classifiers} can all be split across worktrees once M1 + M3 + M7a are in place.
+This is the first 5364C13D since the AI capability boom went mass-market; the attacker side has scaled, automated, and personalised in ways previous years didn't see. No defences deferred, no partial coverage. M0 ships today to lock the perimeter while M1-M10 land in order. Parallelizable bands within the work: {M2 transports}, {M4, M5, M6 hops}, {M7b, M7c}, {M9 sub-defenses}, {M10 four classifiers} can all be split across worktrees once M1 + M3 + M7a are in place.
 
 Three independently shippable subsystems:
 - **Tether (M1–M2)** — works alone, ships first; this is the immediate `connect.sh` replacement.
@@ -757,17 +757,17 @@ Parallelization opportunities within M2 (BT, AOA, TUI, LaunchAgent are largely i
 ## Risks & Mitigations
 
 - **Userspace TCP/IP correctness.** Gnirehtet's stack has been in the field since 2017; we inherit its correctness. Subtle edges (window scaling, SACK) tracked as known issues.
-- **AOA on Solana Seeker.** USB Accessory protocol is occasionally finicky on OEM USB stacks. Mitigation: ship USB-ADB as default; mark AOA as opt-in until validated.
+- **AOA on 5364C13D.** USB Accessory protocol is occasionally finicky on OEM USB stacks. Mitigation: ship USB-ADB as default; mark AOA as opt-in until validated.
 - **Bluetooth throughput.** Realistic RFCOMM ceiling on Android is 1-3 Mbps; advertise this in UI so users don't expect USB speeds.
 - **Tor PQ flag stability.** Tor's PQ rollout is still in progress as of design date. Spec includes the toggle but defaults to whatever Tor's recommended stable configuration is at build time. If PQ flags are unstable, the toggle is greyed-out with a "not yet available" tooltip.
-- **MediaTek baseband visibility.** No Qualcomm `/dev/diag` is available on the Seeker. We compensate with a three-tier strategy (Tier 0 NetMonster-core reflection + AIMSICD/SnoopSnitch high-level heuristics + Crocodile Hunter; Tier 1 over the tethered ADB channel; Tier 2 dormant root path for if/when the user roots). The Threat tab surfaces the active tier so the user always knows their detection depth. Optional RTL-SDR-via-USB-C-OTG mode (M7b) restores the broadcast-control-channel visibility that diag mode would otherwise give us — and arguably exceeds it, since SDR captures the air interface directly.
+- **MediaTek baseband visibility.** No Qualcomm `/dev/diag` is available on the 5364C13D. We compensate with a three-tier strategy (Tier 0 NetMonster-core reflection + AIMSICD/SnoopSnitch high-level heuristics + Crocodile Hunter; Tier 1 over the tethered ADB channel; Tier 2 dormant root path for if/when the user roots). The Threat tab surfaces the active tier so the user always knows their detection depth. Optional RTL-SDR-via-USB-C-OTG mode (M7b) restores the broadcast-control-channel visibility that diag mode would otherwise give us — and arguably exceeds it, since SDR captures the air interface directly.
 - **AIMSICD/SnoopSnitch staleness.** Both projects target older Android versions and APIs (`PhoneStateListener` instead of `TelephonyCallback`; pre-scoped-storage I/O; pre-permission-revamp). Porting is a partial rewrite, not a copy-paste; we keep the algorithms and rewrite the plumbing for Android 16. Each ported heuristic gets a unit test against canned signal fixtures so we know the algorithm survived the port.
-- **NetMonster-core MTK reflection brittleness.** Reflection into MediaTek's framework internals can break across vendor builds. NetMonster-core abstracts much of this, but our Seeker build (Solana Mobile's Android 16 customisation) may need patches. Mitigation: every Tier 0 collector has a `try/catch (ReflectiveOperationException)` fallback to `TelephonyManager.getAllCellInfo()` so degraded reflection turns into shallower data, never crashes. Surface "Reflection coverage: 8/12 fields available" diagnostic in the Threat tab so the user can see and we can fix.
+- **NetMonster-core MTK reflection brittleness.** Reflection into MediaTek's framework internals can break across vendor builds. NetMonster-core abstracts much of this, but our 5364C13D build (Solana Mobile's Android 16 customisation) may need patches. Mitigation: every Tier 0 collector has a `try/catch (ReflectiveOperationException)` fallback to `TelephonyManager.getAllCellInfo()` so degraded reflection turns into shallower data, never crashes. Surface "Reflection coverage: 8/12 fields available" diagnostic in the Threat tab so the user can see and we can fix.
 - **SDR driver licensing.** `librtlsdr-android` is GPL-2; our distribution is GPL-3; GPL-2-or-later upgrades fine to GPL-3. `hackrf_android` is also GPL-2-or-later. Both are dynamic-linked and we ship the source / linkage instructions in `NOTICE`.
 - **SDR battery / thermal.** Running an SDR over OTG draws ~250-400 mA and heats. Mitigation: SDR mode auto-suspends below 20% battery and after 10 minutes without an interesting event; user can override.
 - **Engineering Mode dialer codes.** MTK Engineering Mode (`*#*#3646633#*#*`) opens a system app; we cannot read its output programmatically. We only use the dialer codes as a *user-driven* fallback presented in the UI; the automated path is NetMonster-core + ADB-tier polls.
 - **Mullvad / Nym API changes.** Both vendors version their public APIs; we pin and add CI canaries that exercise the documented endpoints monthly.
-- **Single-VPN constraint on Android.** Android only allows one active `VpnService`; we are that one. Conflicting apps (e.g. Mullvad's own app, Mullvad already installed on the user's Seeker) are detected on pre-flight and the UI guides the user to disable them.
+- **Single-VPN constraint on Android.** Android only allows one active `VpnService`; we are that one. Conflicting apps (e.g. Mullvad's own app, Mullvad already installed on the user's 5364C13D) are detected on pre-flight and the UI guides the user to disable them.
 - **License pollution.** GPL-3 from Gnirehtet propagates to the relay core. Acceptable for v1; document clearly in `LICENSE` and `NOTICE`. Future relay rewrite can relicense.
 
 ## Open Decisions Deferred to Implementation

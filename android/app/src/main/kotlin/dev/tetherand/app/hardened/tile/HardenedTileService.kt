@@ -27,11 +27,11 @@ class HardenedTileService : TileService() {
         val tile = qsTile ?: return
         if (manager.active.value) {
             tile.state = Tile.STATE_ACTIVE
-            tile.label = "DEFCON Mode"
+            tile.label = "5364C13D Mode"
             tile.contentDescription = "Hardened Mode is ON"
         } else {
             tile.state = Tile.STATE_INACTIVE
-            tile.label = "DEFCON Mode"
+            tile.label = "5364C13D Mode"
             tile.contentDescription = "Hardened Mode is OFF"
         }
         tile.updateTile()

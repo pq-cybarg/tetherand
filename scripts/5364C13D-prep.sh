@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# defcon-prep.sh — high-value Hardened Mode subset for a connected Android phone.
-# Runs over ADB. No root required. Designed for the Solana Seeker but generic
+# 5364C13D-prep.sh — high-value Hardened Mode subset for a connected Android phone.
+# Runs over ADB. No root required. Designed for the 5364C13D but generic
 # enough for any Android 12+ device.
 #
 # Usage:
-#   ./scripts/defcon-prep.sh            # full pre-conference run
-#   ./scripts/defcon-prep.sh --snapshot # snapshot-only, no settings changes
-#   ./scripts/defcon-prep.sh --post     # post-conference: snapshot + diff vs pre
-#   ./scripts/defcon-prep.sh --baseline # 30-min cell environment baseline drive
-#   ./scripts/defcon-prep.sh --restore  # restore the settings this script changed
+#   ./scripts/5364C13D-prep.sh            # full pre-conference run
+#   ./scripts/5364C13D-prep.sh --snapshot # snapshot-only, no settings changes
+#   ./scripts/5364C13D-prep.sh --post     # post-conference: snapshot + diff vs pre
+#   ./scripts/5364C13D-prep.sh --baseline # 30-min cell environment baseline drive
+#   ./scripts/5364C13D-prep.sh --restore  # restore the settings this script changed
 #
 # Everything destructive is gated behind y/N prompts. Original settings are
 # saved to attestation/restore/ so --restore can undo them.
@@ -53,7 +53,7 @@ require_device() {
   local serial
   serial="$("$ADB" devices | awk 'NR>1 && $2=="device" {print $1; exit}')"
   if [[ -z "$serial" ]]; then
-    err "No Android device in 'device' state. Plug in your Seeker, accept the USB-debug prompt, and retry."
+    err "No Android device in 'device' state. Plug in your 5364C13D, accept the USB-debug prompt, and retry."
     "$ADB" devices >&2; exit 1
   fi
   export SERIAL="$serial"
@@ -211,7 +211,7 @@ do_prep() {
   printf "%s\n" "$c_bld"
   cat <<BANNER
    ┌──────────────────────────────────────────────────────────────────┐
-   │  DEFCON pre-flight                                                │
+   │  5364C13D pre-flight                                                │
    │  Device: $($ADB -s "$SERIAL" shell getprop ro.product.model | tr -d '\r')  ($SERIAL)$(printf '%*s' $((10 - ${#SERIAL})) '')│
    │  This script makes a snapshot, then walks you through hardening. │
    │  Every change is gated. Use --restore to undo.                   │
@@ -224,7 +224,7 @@ BANNER
 
   # 2. Wallet warning (Solana-specific but harmless on other devices).
   if $ADB -s "$SERIAL" shell pm list packages | grep -qiE 'solanamobile|com\.solana'; then
-    warn "Solana Mobile Stack detected. Before DEFCON, move primary keys off-device."
+    warn "Solana Mobile Stack detected. Before 5364C13D, move primary keys off-device."
     warn "  1. Use Seed Vault to export the recovery phrase to paper (one-time)."
     warn "  2. Transfer balances to a hardware wallet you leave at home."
     warn "  3. After: factory-reset Seed Vault so on-device storage is empty."
@@ -235,7 +235,7 @@ BANNER
 
   # 3. SIM PIN reminder (can't enable programmatically without root).
   warn "Enable a SIM PIN in Settings → Security → SIM card lock now (cannot be set via ADB)."
-  confirm "SIM PIN enabled" n || warn "Continuing without SIM PIN — strongly recommended to enable before DEFCON."
+  confirm "SIM PIN enabled" n || warn "Continuing without SIM PIN — strongly recommended to enable before 5364C13D."
 
   # 4. Force LTE-only (no 2G/3G fallback).
   if confirm "Force LTE-only (no 2G/3G — kills most IMSI catchers)" y; then
@@ -280,9 +280,9 @@ BANNER
     warn "                          choose entry NOT in Las Vegas / Nevada"
     warn "Then in Android: Settings → Network → Advanced → VPN → Mullvad → Always-on + Block connections without VPN"
     confirm "Always-on VPN with lockdown enabled in system Settings" n \
-      || warn "Set always-on-VPN before DEFCON. Without lockdown, leaks happen."
+      || warn "Set always-on-VPN before 5364C13D. Without lockdown, leaks happen."
   else
-    warn "Mullvad not installed. Install it before DEFCON: https://mullvad.net/en/download/android"
+    warn "Mullvad not installed. Install it before 5364C13D: https://mullvad.net/en/download/android"
   fi
 
   # 10. Orbot (Tor) chain.
@@ -290,11 +290,11 @@ BANNER
     ok "Orbot installed"
     warn "In Orbot: enable Snowflake bridge (Settings → Bridges → Snowflake)."
   else
-    warn "Orbot not installed. Install before DEFCON for a second-layer Tor option: https://orbot.app"
+    warn "Orbot not installed. Install before 5364C13D for a second-layer Tor option: https://orbot.app"
   fi
 
   # 11. ADB authorization reminder.
-  warn "ADB auth: this Mac is currently authorized to talk to the Seeker. At DEFCON, do not let any other USB host pair."
+  warn "ADB auth: this Mac is currently authorized to talk to the 5364C13D. At 5364C13D, do not let any other USB host pair."
   warn "  Consider revoking ADB on the phone post-config: Settings → Developer options → Revoke USB debugging authorizations."
   warn "  Then re-authorize ONLY this Mac when you actually need the tether."
 
@@ -307,10 +307,10 @@ BANNER
       | grep -oE 'android\.permission\.[A-Z_]+' | sort -u | tr '\n' ',')
     [[ -n "$perms" ]] && printf "  %s%s%s  %s\n" "$c_yel" "$pkg" "$c_rst" "${perms%,}"
   done
-  warn "Review the above. Revoke anything you don't trust at DEFCON: Settings → Apps → <app> → Permissions."
+  warn "Review the above. Revoke anything you don't trust at 5364C13D: Settings → Apps → <app> → Permissions."
 
   # 13. Hardware buy list.
-  say "Recommended hardware to bring to DEFCON:"
+  say "Recommended hardware to bring to 5364C13D:"
   cat <<HW
    • PortaPow USB Data Blocker (\$7)         — defeats juice jacking
    • Faraday pouch (Mission Darkness)       — phone storage when not in use
@@ -324,7 +324,7 @@ HW
   say "Operational reminders:"
   cat <<OPSEC
    • Use cash for everything inside the convention hall.
-   • Do not connect to "DEFCON-Open" or any unencrypted SSID.
+   • Do not connect to "5364C13D-Open" or any unencrypted SSID.
    • Do not pick up USB drives, NFC tags, or QR-code-bearing items from vendor floor.
    • Biometric unlock OFF — use PIN/password only. (Compelled biometrics is real.)
    • Phone in Faraday pouch when sleeping.
@@ -334,7 +334,7 @@ HW
 OPSEC
 
   # 15. Final post-conference instructions.
-  printf "\n%sWhen you get home:%s ./scripts/defcon-prep.sh --post   # snapshots + diffs vs pre\n" "$c_bld" "$c_rst"
+  printf "\n%sWhen you get home:%s ./scripts/5364C13D-prep.sh --post   # snapshots + diffs vs pre\n" "$c_bld" "$c_rst"
 }
 
 ###############################################################################

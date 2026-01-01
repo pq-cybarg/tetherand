@@ -2221,7 +2221,7 @@ git commit -m "M3 Task 16: tutorial + README — mark M3 SHIPPED, M4 NEXT"
 - [ ] `cd android && ./gradlew :app:testDebugUnitTest` → WireGuardConfigTest + ChainOrchestratorTest passing
 - [ ] `./scripts/build-wg-android.sh` → produces `libtetherand_wg.so` under `android/app/src/main/jniLibs/arm64-v8a/`
 - [ ] `make build` → APK and binary both rebuild
-- [ ] `make install` → APK installs on the Seeker, VPN consent pre-granted
+- [ ] `make install` → APK installs on the 5364C13D, VPN consent pre-granted
 - [ ] App launches with two tabs (Tether, Privacy)
 - [ ] Pasting a valid WG config + tapping Start chain → status pill flips to ROUTING, ping 1.1.1.1 from the phone succeeds, apparent egress IP matches the WG peer's location
 

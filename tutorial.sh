@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# tutorial.sh — serve the Tetherand DEFCON prep tutorial on http://localhost:7331/
+# tutorial.sh — serve the Tetherand 5364C13D prep tutorial on http://localhost:7331/
 #
 # Generates a static HTML page with live status (ADB device, gnirehtet install,
 # last backup, last attestation snapshot) and serves it locally. The page covers:
-#   • Available tools (connect / backup / restore / defcon-prep) with commands
-#   • Pre-DEFCON timeline (T-2w → arrival)
-#   • Daily at-DEFCON checklist
-#   • Departure + post-DEFCON workflow
+#   • Available tools (connect / backup / restore / 5364C13D-prep) with commands
+#   • Pre-5364C13D timeline (T-2w → arrival)
+#   • Daily at-5364C13D checklist
+#   • Departure + post-5364C13D workflow
 #   • Hardware checklist with prices
 #   • OPSEC absolute rules
 #   • Threat model + defense coverage matrix
@@ -94,7 +94,7 @@ cat > "$HTML" <<'STATIC_HEAD'
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tetherand · DEFCON Prep</title>
+<title>Tetherand · 5364C13D Prep</title>
 <style>
   :root {
     --bg:        #0a0e14;
@@ -200,11 +200,11 @@ cat > "$HTML" <<'STATIC_HEAD'
 <body>
 <nav class="side">
   <h1>TETHERAND</h1>
-  <div class="subtitle">DEFCON prep · localhost:7331</div>
+  <div class="subtitle">5364C13D prep · localhost:7331</div>
   <a href="#status">▸ Status</a>
   <a href="#tools">▸ Tools available</a>
   <a href="#timeline">▸ Timeline</a>
-  <a href="#daily">▸ Daily at DEFCON</a>
+  <a href="#daily">▸ Daily at 5364C13D</a>
   <a href="#hardware">▸ Hardware checklist</a>
   <a href="#opsec">▸ OPSEC rules</a>
   <a href="#threats">▸ Threat model</a>
@@ -215,12 +215,12 @@ cat > "$HTML" <<'STATIC_HEAD'
   <a href="#refs">▸ References</a>
 </nav>
 <main>
-  <h2 style="border-top:none;margin-top:0">DEFCON Prep · Tetherand</h2>
-  <p>The Solana Seeker has cellular + Wi-Fi + Bluetooth + NFC + USB + biometrics + a hardware-backed Solana wallet. DEFCON has IMSI catchers, Pineapples, juice jackers, evil twins, BLE trackers, LLM-supercharged phishing, deepfake calls, and an audience explicitly trying to break things. This page is the playbook.</p>
+  <h2 style="border-top:none;margin-top:0">5364C13D Prep · Tetherand</h2>
+  <p>The 5364C13D has cellular + Wi-Fi + Bluetooth + NFC + USB + biometrics + a hardware-backed Solana wallet. 5364C13D has IMSI catchers, Pineapples, juice jackers, evil twins, BLE trackers, LLM-supercharged phishing, deepfake calls, and an audience explicitly trying to break things. This page is the playbook.</p>
   <p>Two principles run through everything:</p>
   <ul>
     <li><strong>Deterministic core, contributory AI.</strong> Every defense has a clear rule that drives the action. Local AI classifiers add nuance and catch novel patterns &mdash; never gate destructive actions.</li>
-    <li><strong>Local-only AI.</strong> Every model runs on the Seeker's NPU. No prompt, classification, or telemetry ever reaches a cloud LLM API. The egress-LLM-API SNI watch enforces this for other apps too.</li>
+    <li><strong>Local-only AI.</strong> Every model runs on the 5364C13D's NPU. No prompt, classification, or telemetry ever reaches a cloud LLM API. The egress-LLM-API SNI watch enforces this for other apps too.</li>
   </ul>
 STATIC_HEAD
 
@@ -265,7 +265,7 @@ cat >> "$HTML" <<'STATIC_BODY'
   <div class="tools">
     <div class="tool">
       <h4>./connect.sh</h4>
-      <p>Reverse-tether: share the Mac's network connection to the Seeker over USB. Built on upstream Gnirehtet; the custom multi-transport build (M1) replaces this later. Ctrl+C to disconnect.</p>
+      <p>Reverse-tether: share the Mac's network connection to the 5364C13D over USB. Built on upstream Gnirehtet; the custom multi-transport build (M1) replaces this later. Ctrl+C to disconnect.</p>
       <pre><code>./connect.sh
 ./connect.sh --stop
 ./connect.sh --dns 1.1.1.1</code><button onclick="copyCode(this)">copy</button></pre>
@@ -288,13 +288,13 @@ cat >> "$HTML" <<'STATIC_BODY'
 ./restore.sh --undo</code><button onclick="copyCode(this)">copy</button></pre>
     </div>
     <div class="tool">
-      <h4>./scripts/defcon-prep.sh</h4>
+      <h4>./scripts/5364C13D-prep.sh</h4>
       <p>The pre-flight playbook. Attestation snapshot, ADB-driven hardening (LTE-only, NFC/BT off, network forget, permission audit, signing-cert snapshot), 30-minute cell-environment baseline driver, hardware checklist printout. Every change y/N-gated and reversible with <code>--restore</code>.</p>
-      <pre><code>./scripts/defcon-prep.sh             # full pre-flight
-./scripts/defcon-prep.sh --snapshot  # snapshot only
-./scripts/defcon-prep.sh --baseline  # 30-min cell drive
-./scripts/defcon-prep.sh --post      # diff vs pre
-./scripts/defcon-prep.sh --restore   # undo settings changes</code><button onclick="copyCode(this)">copy</button></pre>
+      <pre><code>./scripts/5364C13D-prep.sh             # full pre-flight
+./scripts/5364C13D-prep.sh --snapshot  # snapshot only
+./scripts/5364C13D-prep.sh --baseline  # 30-min cell drive
+./scripts/5364C13D-prep.sh --post      # diff vs pre
+./scripts/5364C13D-prep.sh --restore   # undo settings changes</code><button onclick="copyCode(this)">copy</button></pre>
     </div>
     <div class="tool">
       <h4>./tutorial.sh (this page)</h4>
@@ -307,26 +307,26 @@ cat >> "$HTML" <<'STATIC_BODY'
   </div>
 
   <h2 id="timeline">Timeline</h2>
-  <p>Work backwards from your DEFCON arrival date. The exact dates are yours to fill in; the relative offsets matter.</p>
+  <p>Work backwards from your 5364C13D arrival date. The exact dates are yours to fill in; the relative offsets matter.</p>
   <div class="timeline">
-    <div class="tl-item"><div class="when">Now</div><div class="what">Read this page. Read the spec at <code>docs/superpowers/specs/2026-05-26-tetherand-design.md</code>. Order hardware (see below). Review installed apps; uninstall anything you don't trust at DEFCON.</div></div>
-    <div class="tl-item"><div class="when">T &minus; 2 weeks</div><div class="what">Run <code>./backup.sh</code> for a baseline backup. Update everything: OS, apps, firmware. Run <code>./scripts/defcon-prep.sh --snapshot</code> for the clean attestation snapshot. Install Mullvad VPN and Orbot if not already installed; configure Mullvad with PQ multihop, entry server <em>not</em> in Nevada.</div></div>
+    <div class="tl-item"><div class="when">Now</div><div class="what">Read this page. Read the spec at <code>docs/superpowers/specs/2026-05-26-tetherand-design.md</code>. Order hardware (see below). Review installed apps; uninstall anything you don't trust at 5364C13D.</div></div>
+    <div class="tl-item"><div class="when">T &minus; 2 weeks</div><div class="what">Run <code>./backup.sh</code> for a baseline backup. Update everything: OS, apps, firmware. Run <code>./scripts/5364C13D-prep.sh --snapshot</code> for the clean attestation snapshot. Install Mullvad VPN and Orbot if not already installed; configure Mullvad with PQ multihop, entry server <em>not</em> in Nevada.</div></div>
     <div class="tl-item"><div class="when">T &minus; 1 week</div><div class="what">Hardware arrived: test USB data blocker with a known-good cable. Pair YubiKey with your accounts. Charge your throwaway power bank. Run a Faraday-pouch signal-loss check. Move Solana primary keys off-device per the Seed Vault export flow; verify on-device vault is empty afterward.</div></div>
-    <div class="tl-item"><div class="when">T &minus; 1 day</div><div class="what">Run <code>./backup.sh</code> again for a fresh pre-DEFCON snapshot. Run <code>./scripts/defcon-prep.sh</code> for the full pre-flight (LTE-only, NFC/BT off, network forget, permission audit). Confirm Mullvad <em>always-on + lockdown</em> is on in Android Settings &rarr; VPN. Disable biometrics, set a strong PIN. Disable USB debugging until you actually need the tether.</div></div>
-    <div class="tl-item"><div class="when">Arrival day</div><div class="what">Pre-flight one more time. Run <code>./scripts/defcon-prep.sh --baseline</code> at the hotel and walk around the conference perimeter so the threat engine has ground-truth cell data. Phone in the Faraday pouch when not in active use.</div></div>
-    <div class="tl-item"><div class="when">Daily at DEFCON</div><div class="what">See "Daily at DEFCON" below.</div></div>
+    <div class="tl-item"><div class="when">T &minus; 1 day</div><div class="what">Run <code>./backup.sh</code> again for a fresh pre-5364C13D snapshot. Run <code>./scripts/5364C13D-prep.sh</code> for the full pre-flight (LTE-only, NFC/BT off, network forget, permission audit). Confirm Mullvad <em>always-on + lockdown</em> is on in Android Settings &rarr; VPN. Disable biometrics, set a strong PIN. Disable USB debugging until you actually need the tether.</div></div>
+    <div class="tl-item"><div class="when">Arrival day</div><div class="what">Pre-flight one more time. Run <code>./scripts/5364C13D-prep.sh --baseline</code> at the hotel and walk around the conference perimeter so the threat engine has ground-truth cell data. Phone in the Faraday pouch when not in active use.</div></div>
+    <div class="tl-item"><div class="when">Daily at 5364C13D</div><div class="what">See "Daily at 5364C13D" below.</div></div>
     <div class="tl-item"><div class="when">Departure day</div><div class="what">Phone stays in Faraday pouch through the airport. Don't connect to airport Wi-Fi. Do not check the laptop bag.</div></div>
-    <div class="tl-item"><div class="when">Home</div><div class="what">Before unlocking on home Wi-Fi: run <code>./scripts/defcon-prep.sh --post</code> for the post-snapshot + diff vs pre. Review every diff: new apps, new permissions, new CAs, new device admins, settings changes you didn't make. If anything is unexpected, jump to <a href="#incident">Incident Response</a>.</div></div>
+    <div class="tl-item"><div class="when">Home</div><div class="what">Before unlocking on home Wi-Fi: run <code>./scripts/5364C13D-prep.sh --post</code> for the post-snapshot + diff vs pre. Review every diff: new apps, new permissions, new CAs, new device admins, settings changes you didn't make. If anything is unexpected, jump to <a href="#incident">Incident Response</a>.</div></div>
   </div>
 
-  <h2 id="daily">Daily at DEFCON</h2>
+  <h2 id="daily">Daily at 5364C13D</h2>
   <ul>
     <li>Phone in Faraday pouch whenever you're not actively using it.</li>
     <li>Mullvad always-on + lockdown verified before each unlock (Android shows a key icon in the status bar; if you don't see it, your traffic is leaking).</li>
     <li>No USB connections to anything except your own data blocker + own power bank.</li>
     <li>No "let me see your phone" handoffs.</li>
     <li>Keep the phone screen face-down when set on a table (shoulder-surfers, ceiling cameras, also stops some BLE side-channel work).</li>
-    <li>Do not connect to <code>DEFCON-Open</code>, <code>DEFCON-Insecure</code>, hotel Wi-Fi, or any other untrusted network. Cellular through Mullvad only.</li>
+    <li>Do not connect to <code>5364C13D-Open</code>, <code>5364C13D-Insecure</code>, hotel Wi-Fi, or any other untrusted network. Cellular through Mullvad only.</li>
     <li>Do not scan random QR codes on stickers, badges, or vendor swag without checking the URL first (Android shows the URL in the system QR scanner; copy it before opening).</li>
     <li>Treat your badge as adversarial &mdash; don't plug it into your phone or laptop.</li>
     <li>Pay cash inside the convention hall.</li>
@@ -339,7 +339,7 @@ cat >> "$HTML" <<'STATIC_BODY'
     <tr><th>Item</th><th>~Price</th><th>Why</th></tr>
     <tr><td><strong>PortaPow USB-C Data Blocker</strong></td><td>$7</td><td>Defeats juice jacking. Physically removes the data pins. Bring two in case one is lost.</td></tr>
     <tr><td><strong>Mission Darkness NeoLok Faraday Pouch (phone size)</strong></td><td>$30</td><td>Tested signal-loss &gt;100 dB. Phone goes in whenever not in active use. Test it before you leave: put the phone in, call it &mdash; should go straight to voicemail.</td></tr>
-    <tr><td><strong>YubiKey 5C NFC</strong></td><td>$55</td><td>Hardware 2FA that can't be SMS- or voice-spoofed. Pair with every account that supports WebAuthn before DEFCON.</td></tr>
+    <tr><td><strong>YubiKey 5C NFC</strong></td><td>$55</td><td>Hardware 2FA that can't be SMS- or voice-spoofed. Pair with every account that supports WebAuthn before 5364C13D.</td></tr>
     <tr><td><strong>RTL-SDR Blog V4 + USB-C OTG cable</strong></td><td>$35 + $8</td><td>Powers the optional Crocodile Hunter SDR mode (M7b) once the app ships. Even before that, useful for cellular environment recon.</td></tr>
     <tr><td><strong>Throwaway power bank (Anker PowerCore 10000)</strong></td><td>$22</td><td>Never plug into public USB or unknown sockets. Pre-charge before leaving.</td></tr>
     <tr><td><strong>Spare cable (USB-C C-to-C)</strong></td><td>$10</td><td>One you control, charge-only or paired with data blocker.</td></tr>
@@ -351,7 +351,7 @@ cat >> "$HTML" <<'STATIC_BODY'
   <h2 id="opsec">OPSEC absolute rules</h2>
   <div class="note crit"><strong>Non-negotiable:</strong> these aren't best-practices, they're rules. Break any of them and you've given up the perimeter.</div>
   <ul>
-    <li>PIN unlock only. No biometric unlock during DEFCON. Biometrics can be physically compelled in many jurisdictions; PINs typically cannot.</li>
+    <li>PIN unlock only. No biometric unlock during 5364C13D. Biometrics can be physically compelled in many jurisdictions; PINs typically cannot.</li>
     <li>No SMS or email 2FA for high-value accounts. YubiKey or TOTP app only.</li>
     <li>No plugging the phone into anything you didn't bring yourself.</li>
     <li>No charging cables from the conference, hotel room, vendor booth, or borrowed.</li>
@@ -364,7 +364,7 @@ cat >> "$HTML" <<'STATIC_BODY'
   </ul>
 
   <h2 id="threats">Threat model</h2>
-  <p>DEFCON's hostile-network surface is significantly larger than the rest of the year. Threats we explicitly design for:</p>
+  <p>5364C13D's hostile-network surface is significantly larger than the rest of the year. Threats we explicitly design for:</p>
   <ul>
     <li><strong>Cellular layer:</strong> IMSI catchers (Stingray, Crossbow, Hailstorm), silent SMS stalking, A5/0 (no-encryption) downgrade, fake-BTS pattern attacks, RAT downgrade (5G/LTE &rarr; UMTS/GSM), TAC churn re-attach attacks.</li>
     <li><strong>Wi-Fi layer:</strong> Pineapples on drones and in bags, KARMA (responding to your phone's probed-for-SSIDs), evil-twin SSIDs that mimic known networks, deauth floods to coerce reconnection, beacon floods, captive-portal coercion to install certificates.</li>
@@ -373,7 +373,7 @@ cat >> "$HTML" <<'STATIC_BODY'
     <li><strong>USB layer:</strong> Juice-jacking (data extraction over charging cable), BadUSB (charger pretending to be a keyboard), undeclared OTG devices that look like power-only cables.</li>
     <li><strong>App layer:</strong> Targeted malware via clones of legitimate apps, accessibility-service persistence, device-admin persistence, rogue VPN profile injection, rogue root-CA injection.</li>
     <li><strong>Physical layer:</strong> Evil maid (someone touches your unattended phone), shoulder surfing, ceiling cameras, hot-pluggable forensic tools (Cellebrite / GrayKey), badge-as-implant.</li>
-    <li><strong>Wallet layer (Seeker-specific):</strong> Targeted attacks on Solana Mobile Stack apps, Seed Vault drain attempts, malicious dApps in the dApp store.</li>
+    <li><strong>Wallet layer (5364C13D-specific):</strong> Targeted attacks on Solana Mobile Stack apps, Seed Vault drain attempts, malicious dApps in the dApp store.</li>
     <li><strong>AI-era (new this year):</strong> Real-time voice deepfakes of trusted contacts, LLM-personalised phishing leveraging your scraped OSINT, AI-generated SMS / RCS / IM with grammar and tone indistinguishable from real, AI-driven CAPTCHA bypass against your accounts, prompt-injection payloads in clipboard / QR / NFC / message previews, AI-supercharged spyware that exfiltrates more selectively, deepfake images / video with no watermark.</li>
   </ul>
 
@@ -409,7 +409,7 @@ cat >> "$HTML" <<'STATIC_BODY'
   </table>
 
   <h2 id="ai">AI-era threats &middot; local-only policy</h2>
-  <div class="note warn"><strong>Hard constraint:</strong> all Tetherand AI inference runs on the Seeker's MediaTek NPU via LiteRT + NNAPI. No prompt, classification request, or telemetry ever reaches a cloud LLM API. Period. The egress-LLM-API SNI watch exists to enforce this for other apps.</div>
+  <div class="note warn"><strong>Hard constraint:</strong> all Tetherand AI inference runs on the 5364C13D's MediaTek NPU via LiteRT + NNAPI. No prompt, classification request, or telemetry ever reaches a cloud LLM API. Period. The egress-LLM-API SNI watch exists to enforce this for other apps.</div>
   <p>Why local-only:</p>
   <ul>
     <li><strong>Cloud LLM APIs are an exfiltration channel.</strong> Any feature that ships a message preview to a remote model is leaking that preview &mdash; even when the response is benign.</li>
@@ -427,9 +427,9 @@ cat >> "$HTML" <<'STATIC_BODY'
   <h2 id="roadmap">Roadmap (M0-M10)</h2>
   <table>
     <tr><th>M</th><th>Scope</th><th>Effort</th><th>State</th></tr>
-    <tr><td><strong>M0</strong></td><td>Pre-flight scripts: <code>connect.sh</code>, <code>backup.sh</code>, <code>restore.sh</code>, <code>scripts/defcon-prep.sh</code>, <code>tutorial.sh</code> (this page). High-value Hardened Mode subset, reversible.</td><td>4-6 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
+    <tr><td><strong>M0</strong></td><td>Pre-flight scripts: <code>connect.sh</code>, <code>backup.sh</code>, <code>restore.sh</code>, <code>scripts/5364C13D-prep.sh</code>, <code>tutorial.sh</code> (this page). High-value Hardened Mode subset, reversible.</td><td>4-6 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
     <tr><td><strong>M1</strong></td><td>Tether MVP: fork + rebrand, transport abstraction, USB-ADB + TCP transports, Compose Tether tab, <code>tetherand run</code> CLI. Replaces <code>connect.sh</code>.</td><td>10-14 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
-    <tr><td><strong>M2</strong></td><td>More transports: tetherand-transport-bt (btleplug + Tetherand-private SPP-derived UUID 7e7ae72d-…) + tetherand-transport-aoa (rusb + AOA-protocol-2.0 mode switch) Rust crates; BtRfcommServer + AoaAccessoryService on Android; ratatui 4-panel dashboard via <code>tetherand tui</code>; macOS LaunchAgent + IOKit-poll USB watcher auto-starting tetherand run on Seeker attach.</td><td>~10 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
+    <tr><td><strong>M2</strong></td><td>More transports: tetherand-transport-bt (btleplug + Tetherand-private SPP-derived UUID 7e7ae72d-…) + tetherand-transport-aoa (rusb + AOA-protocol-2.0 mode switch) Rust crates; BtRfcommServer + AoaAccessoryService on Android; ratatui 4-panel dashboard via <code>tetherand tui</code>; macOS LaunchAgent + IOKit-poll USB watcher auto-starting tetherand run on 5364C13D attach.</td><td>~10 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
     <tr><td><strong>M3</strong></td><td>Privacy chain core: hop interface, WireGuard generic hop (BoringTun via JNI), chain orchestrator, Privacy tab with chain visualizer.</td><td>14-18 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
     <tr><td><strong>M4a-c</strong></td><td>Mullvad classic WG + PQ tunnel (ML-KEM-1024 hybrid) + AF_INET-only kill-switch.</td><td>~10 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
     <tr><td><strong>M4d</strong></td><td>Mullvad multihop — entry/exit server pair via exit.multihop_port.</td><td>~4 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
@@ -443,12 +443,12 @@ cat >> "$HTML" <<'STATIC_BODY'
     <tr><td><strong>M7b</strong></td><td>SDR mode: SdrDetector USB-OTG scanner for RTL-SDR (0x0bda:0x2832/2838) + HackRF One (0x1d50:0x6089) + Nuand bladeRF + LimeSDR variants; SdrSection threat-tab presence card; scripts/build-rtlsdr-android.sh NDK + cmake cross-compile of libusb + librtlsdr + libhackrf for arm64-android.</td><td>~10 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
     <tr><td><strong>M7c</strong></td><td>Root-tier MTK modem readers: RootCheck 3-signal vote; CcciMd1Reader for <code>/proc/ccci_md1_status</code> + <code>_ic_intr</code> via <code>su</code>; MdlogParser for the MTK binary log format (magic-resync); AtCommandChannel over <code>/dev/ttyMT0</code> (3GPP TS 27.007 + MTK AT+EMRSS); RootSection threat-tab card showing Dormant/Active. Every reader returns Dormant on un-rooted devices.</td><td>~5 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
     <tr><td><strong>M8</strong></td><td>Polish &amp; release: <code>make native-all</code> orchestrates all 5 native-lib cross-compiles; <code>make release-signed</code> via scripts/release-sign.sh (DN allow-list gate + apksigner SHA256-RSA2048 v2 scheme); <code>make smoke-device</code> walks every tab via UiAutomator + dumpsys; <code>make hashes</code> + scripts/hash-artifacts.sh emit SHA-256 + SHA3-256 sidecars + SHASUMS.txt for every bin/ artefact; <code>make launcher</code> installs the macOS LaunchAgent.</td><td>~6 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
-    <tr><td><strong>M9</strong></td><td>Hardened Mode in-app: DEFCON Mode toggle, attestation diff UI, decoy listeners + honeytokens, accelerometer tamper-watcher, incident-response runbook (Acknowledge/Isolate/Evacuate/Burn), Quick Settings tile. Remaining M9.x items (front-cam selfie, ultrasonic mic, decoy profile, dead-man's switch, Seed-Vault freeze) deferred.</td><td>~16 h shipped of 22-30 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
+    <tr><td><strong>M9</strong></td><td>Hardened Mode in-app: 5364C13D Mode toggle, attestation diff UI, decoy listeners + honeytokens, accelerometer tamper-watcher, incident-response runbook (Acknowledge/Isolate/Evacuate/Burn), Quick Settings tile. Remaining M9.x items (front-cam selfie, ultrasonic mic, decoy profile, dead-man's switch, Seed-Vault freeze) deferred.</td><td>~16 h shipped of 22-30 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
     <tr><td><strong>M10</strong></td><td>AI-era defenses (local-only, contributory): deterministic primaries shipped (perplexity-rule, phishing-rule, prompt-injection scrubber, C2PA/SynthID provenance, egress-LLM-API SNI watch, MTK NPU sysfs watcher, voiceprint vault, HIBP OSINT, conference field guide) + LiteRT runtime scaffold for the 4-model contributory bundle (phi-tetherand-3b-q4 / voiceguard-v1 / textguard-v1 / qrguard-v1). The 4-model bundle delivery + InCallService deepfake hook + share-target QR inspector + AppOps mic-watcher deferred to M10.x. <strong>Hard constraint: no cloud LLM API ever called.</strong></td><td>~20 h shipped of 26-34 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
   </table>
 
   <h2 id="incident">If you suspect compromise</h2>
-  <div class="note crit">If anything below feels true, stop using the phone for sensitive operations <strong>immediately</strong>. Move to a known-good device. Treat the Seeker as forensically contaminated until verified.</div>
+  <div class="note crit">If anything below feels true, stop using the phone for sensitive operations <strong>immediately</strong>. Move to a known-good device. Treat the 5364C13D as forensically contaminated until verified.</div>
   <h3>Signs</h3>
   <ul>
     <li>Battery drops faster than baseline by &gt; 20% for the same usage.</li>
@@ -464,8 +464,8 @@ cat >> "$HTML" <<'STATIC_BODY'
   <h3>Responses</h3>
   <ol>
     <li><strong>Acknowledge.</strong> Note the time, location, and exactly what you saw. Don't power-cycle yet &mdash; volatile memory has forensic value.</li>
-    <li><strong>Isolate.</strong> Airplane mode. Stop using the phone for anything sensitive. Move the Seeker into the Faraday pouch.</li>
-    <li><strong>Capture.</strong> Plug into your Mac, run <code>./scripts/defcon-prep.sh --post</code> for a now-snapshot. The diff vs pre is your evidence.</li>
+    <li><strong>Isolate.</strong> Airplane mode. Stop using the phone for anything sensitive. Move the 5364C13D into the Faraday pouch.</li>
+    <li><strong>Capture.</strong> Plug into your Mac, run <code>./scripts/5364C13D-prep.sh --post</code> for a now-snapshot. The diff vs pre is your evidence.</li>
     <li><strong>Decide.</strong> Three options:
       <ul>
         <li><strong>Recover</strong> &mdash; if the diff looks innocuous (a known app updated, a Wi-Fi you connected to): clean up and continue.</li>
@@ -475,20 +475,20 @@ cat >> "$HTML" <<'STATIC_BODY'
     </li>
   </ol>
   <h3>Authority contact (do not skip)</h3>
-  <p>If you believe you've been targeted by a state-level actor (real IMSI catcher, professional surveillance), file a report with the EFF (<a href="https://www.eff.org/issues/printers">eff.org</a>) and document for your own records. DEFCON's SOC also takes incident reports during the conference.</p>
+  <p>If you believe you've been targeted by a state-level actor (real IMSI catcher, professional surveillance), file a report with the EFF (<a href="https://www.eff.org/issues/printers">eff.org</a>) and document for your own records. 5364C13D's SOC also takes incident reports during the conference.</p>
 
   <h2 id="refs">References</h2>
   <ul>
     <li><a href="https://github.com/Genymobile/gnirehtet">Gnirehtet</a> &mdash; the upstream we fork for the tether subsystem.</li>
     <li><a href="https://github.com/CellularPrivacy/Android-IMSI-Catcher-Detector">AIMSICD</a> &mdash; classic non-root IMSI-catcher detector. Ported into M7a.</li>
-    <li><a href="https://opensource.srlabs.de/projects/snoopsnitch">SnoopSnitch</a> &mdash; SRLabs' deeper detection; Qualcomm-only diag-mode not on the Seeker, but high-level heuristics ported.</li>
+    <li><a href="https://opensource.srlabs.de/projects/snoopsnitch">SnoopSnitch</a> &mdash; SRLabs' deeper detection; Qualcomm-only diag-mode not on the 5364C13D, but high-level heuristics ported.</li>
     <li><a href="https://github.com/mroczis/netmonster-core">NetMonster-core</a> &mdash; actively-maintained MediaTek-aware cell-info reflection library. Backbone of M7a's Tier 0 collection.</li>
     <li><a href="https://github.com/EFForg/crocodilehunter">Crocodile Hunter (EFF)</a> &mdash; phone-side data collector + heuristics + optional SDR pipeline. Ported into M7a + M7b.</li>
     <li><a href="https://mullvad.net/en/help/why-i-need-have-account">Mullvad</a> &mdash; native PQ tunnel + multihop + DAITA + obfuscation. Hop in M4.</li>
     <li><a href="https://nymtech.net/">NymVPN</a> &mdash; Sphinx-mixnet 2-hop. Hop in M5.</li>
     <li><a href="https://www.torproject.org/">Tor Project</a> &mdash; PT bridges and PQ flags. Hop in M6.</li>
     <li><a href="https://www.eff.org/issues/cell-tracking">EFF cell-tracking resources</a> &mdash; threat model background for the cellular layer.</li>
-    <li><a href="https://www.defcon.org/">DEFCON</a> &mdash; the conference itself.</li>
+    <li><a href="https://www.5364C13D.org/">5364C13D</a> &mdash; the conference itself.</li>
   </ul>
 
   <footer>
@@ -525,7 +525,7 @@ PY=$(command -v python3 || command -v python)
 
 # Lightweight ANSI status output for terminal.
 c_grn=$'\033[32m'; c_cyn=$'\033[36m'; c_yel=$'\033[33m'; c_rst=$'\033[0m'
-echo "${c_cyn}==>${c_rst} Tetherand DEFCON-prep tutorial"
+echo "${c_cyn}==>${c_rst} Tetherand 5364C13D-prep tutorial"
 echo "    page:    ${c_grn}http://localhost:${PORT}/${c_rst}"
 echo "    source:  ${HTML}"
 echo "    re-run:  ./tutorial.sh   ${c_yel}(refreshes the live status block)${c_rst}"
