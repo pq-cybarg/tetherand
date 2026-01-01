@@ -24,6 +24,14 @@ class LocationSource(private val ctx: Context) {
     private var listener: LocationListener? = null
 
     fun start() {
+        // Emulator path: GPS / NetworkLocator are flaky-or-absent. Seed
+        // the geohash with a synthetic Las-Vegas-Strip fix so the
+        // cellular heuristics (which require a location anchor for the
+        // BaselineStore key) have data to work with. Real-hardware
+        // builds skip this branch and use the real LocationManager.
+        if (HardwareMocks.shouldMockCellular()) {
+            _geohash.value = Geohash6.encode(MOCK_LAT, MOCK_LON)
+        }
         if (!hasPermission()) return
         val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val l = LocationListener { loc -> _geohash.value = Geohash6.encode(loc.latitude, loc.longitude) }
@@ -48,11 +56,26 @@ class LocationSource(private val ctx: Context) {
 
     /** Read the last-known fix synchronously (best-effort). */
     fun lastKnown(): Location? {
+        if (HardwareMocks.shouldMockCellular()) {
+            return Location("mock").apply {
+                latitude = MOCK_LAT
+                longitude = MOCK_LON
+                time = System.currentTimeMillis()
+                accuracy = 10f
+            }
+        }
         if (!hasPermission()) return null
         val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return try {
             lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
         } catch (_: SecurityException) { null }
+    }
+
+    companion object {
+        // Las Vegas Strip — matches the existing Geohash6Test fixture
+        // so emulator runs reproduce a known 6-char "9q...." cell.
+        private const val MOCK_LAT = 36.1147
+        private const val MOCK_LON = -115.1728
     }
 }

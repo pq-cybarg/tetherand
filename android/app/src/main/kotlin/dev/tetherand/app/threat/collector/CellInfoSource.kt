@@ -34,6 +34,13 @@ class CellInfoSource(private val ctx: Context) {
     val observations: StateFlow<List<CellObservation>> = _observations.asStateFlow()
 
     fun sample() {
+        // Emulator path: NetMonster returns an empty list because there's
+        // no real modem. Inject synthetic cell observations so the
+        // BTS / RAT / TAC / EARFCN / reattach heuristics still run.
+        if (HardwareMocks.shouldMockCellular()) {
+            _observations.value = HardwareMocks.syntheticCells()
+            return
+        }
         if (!hasPermission()) return
         val cells: List<ICell> = try { nm.getCells() } catch (_: Throwable) { emptyList() }
         val out = cells.mapNotNull { translate(it) }
