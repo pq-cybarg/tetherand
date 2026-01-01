@@ -87,5 +87,33 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="privacy_chain"/>
         </service>
+
+        <!-- M9: Hardened Mode honeypot. Binds 6 unprivileged TCP ports
+             (8080/8443/8000/9000/1080/3128) and logs every inbound
+             connection as a High-severity Alert via ThreatDb. Foreground
+             service so the OS doesn't kill it while Hardened Mode is
+             active during a conference. -->
+        <service
+            android:name=".hardened.decoy.DecoyListenerService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="honeypot"/>
+        </service>
+
+        <!-- M9: Hardened Mode Quick Settings tile ("DEFCON Mode"). One-tap
+             entry/exit. Must be exported with BIND_QUICK_SETTINGS_TILE so
+             the system SystemUI process can bind to it. -->
+        <service
+            android:name=".hardened.tile.HardenedTileService"
+            android:icon="@drawable/ic_report_problem_24dp"
+            android:label="DEFCON Mode"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE"/>
+            </intent-filter>
+        </service>
     </application>
 </manifest>
