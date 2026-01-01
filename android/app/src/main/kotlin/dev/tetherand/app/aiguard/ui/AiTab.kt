@@ -77,6 +77,7 @@ fun AiTab() {
         }
 
         // Action cards.
+        ModelUpdaterCard()
         EgressWatchCard()
         VerifyCallerCard()
         OsintCard()

@@ -27,32 +27,38 @@ class AiGuardRuntime private constructor(private val ctx: Context) {
     private val _statuses = MutableStateFlow(initialStatuses())
     val statuses: StateFlow<List<ModelStatus>> = _statuses.asStateFlow()
 
-    private fun initialStatuses(): List<ModelStatus> =
-        ModelBundle.ALL.map { m ->
-            val present = try { ctx.assets.open(m.assetPath).close(); true }
-                          catch (_: Throwable) { false }
-            ModelStatus(m.id, if (present) ModelStatus.State.Loaded else ModelStatus.State.NotPresent,
-                        backend = "ndk-cpu", sizeMb = m.sizeMb)
-        }
+    /** Where the ModelUpdater writes downloaded + hash-verified
+     *  .tflite files. Checked alongside the APK assets dir. */
+    private val downloadsDir = java.io.File(ctx.filesDir, "aiguard")
 
-    /** Try to load all models. NoOp safe if they're absent. */
+    private fun initialStatuses(): List<ModelStatus> =
+        ModelBundle.ALL.map { m -> resolveModel(m) }
+
+    /** Try to load all models. NoOp safe if they're absent. Re-runs
+     *  the location resolution so that a successful ModelUpdater pass
+     *  immediately flips the status flags. */
     fun loadAll() {
-        // v1 doesn't actually create Interpreter instances — that needs
-        // the model bytes to exist. We surface the readiness state
-        // honestly and defer actual LiteRT Interpreter creation to
-        // M10.x once the model file is present and hash-verified.
-        // The structure here is the integration point for that future code.
-        val out = mutableListOf<ModelStatus>()
-        for (m in ModelBundle.ALL) {
-            try {
-                ctx.assets.open(m.assetPath).use { /* present */ }
-                out.add(ModelStatus(m.id, ModelStatus.State.Loaded, backend = "nnapi", sizeMb = m.sizeMb))
-            } catch (_: Throwable) {
-                out.add(ModelStatus(m.id, ModelStatus.State.NotPresent, backend = "n/a", sizeMb = m.sizeMb))
-            }
-        }
+        val out = ModelBundle.ALL.map { resolveModel(it) }
         _statuses.value = out
         Log.i("AiGuardRuntime", "model bundle: " + out.joinToString { "${it.id}=${it.state}" })
+    }
+
+    /** Single-model resolver: prefers a downloaded copy under
+     *  filesDir/aiguard/ (ModelUpdater target) over the APK assets
+     *  copy (built-in bundle). Either source counts as "Loaded". */
+    private fun resolveModel(m: ModelBundle.Model): ModelStatus {
+        val downloaded = java.io.File(downloadsDir, "${m.id}.tflite")
+        val backend = when {
+            downloaded.isFile -> "downloaded · nnapi"
+            else -> {
+                val bundled = try { ctx.assets.open(m.assetPath).close(); true }
+                              catch (_: Throwable) { false }
+                if (bundled) "bundled · nnapi" else "n/a"
+            }
+        }
+        val state = if (backend == "n/a") ModelStatus.State.NotPresent
+                    else ModelStatus.State.Loaded
+        return ModelStatus(m.id, state, backend, m.sizeMb)
     }
 
     companion object {
