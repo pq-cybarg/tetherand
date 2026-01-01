@@ -56,6 +56,20 @@ object DrandVerifier {
      *
      * Captured 2026-05-31 from the upstream chain-info endpoint:
      * scheme = `bls-unchained-g1-rfc9380`, period = 3s, genesis = 1692803367.
+     *
+     * **Rotation policy.** drand chain pubkeys rotate rarely (League
+     * of Entropy hard fork — the last rotation moved from the legacy
+     * `pedersen-bls-chained` chain to quicknet in 2023). When a
+     * rotation IS announced upstream, capture the new pubkey from the
+     * same `/info` endpoint and replace the constant here, alongside
+     * a new [QUICKNET_CHAIN_HASH] if the chain hash also changed.
+     *
+     * In the meantime, [verifyChainInfoUnchanged] can be called from
+     * a periodic monitor to detect upstream rotation BEFORE we
+     * silently start absorbing rounds from the wrong chain. Today
+     * `PublicBeacons` doesn't call it on the hot path (it would add a
+     * second HTTPS round-trip per refresh); future M11.x can move
+     * this into the BridgeRotation-style periodic worker.
      */
     const val QUICKNET_PUBKEY_HEX =
         "83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c" +
@@ -64,6 +78,30 @@ object DrandVerifier {
     /** Quicknet chain hash — the URL slug. */
     const val QUICKNET_CHAIN_HASH =
         "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971"
+
+    /**
+     * Sanity-check the pubkey returned by drand's `/info` endpoint
+     * against our pinned [QUICKNET_PUBKEY_HEX]. Returns true when
+     * they match; false on any mismatch or fetch error.
+     *
+     * Call sites are expected to surface a `false` return as an
+     * informational alert ("drand quicknet chain pubkey changed; the
+     * pinned constant in DrandVerifier.kt needs a refresh"), NOT as
+     * a security failure — the pinned constant is the strict trust
+     * anchor regardless of what the network says. A mismatch means
+     * we'll continue to reject rounds (since the network's signatures
+     * would now be from a different keypair) and the user gets
+     * graceful degradation under the random-oracle defense.
+     */
+    fun verifyChainInfoUnchanged(infoJson: String): Boolean {
+        return try {
+            val json = org.json.JSONObject(infoJson)
+            val networkPub = json.optString("public_key", "")
+            networkPub.equals(QUICKNET_PUBKEY_HEX, ignoreCase = true)
+        } catch (_: Throwable) {
+            false
+        }
+    }
 
     /**
      * Verify a drand-quicknet round signature.

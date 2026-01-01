@@ -79,6 +79,10 @@ pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeStartSocks(
     }
 }
 
+/// Open a Tor circuit to host:port and return a stream_id (positive
+/// integer) the Kotlin caller passes to subsequent nativeStreamRead /
+/// nativeStreamWrite / nativeClose calls. Returns 0 (which Kotlin
+/// treats as "dial failed") on any error.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeDial(
     mut env: JNIEnv,
@@ -87,57 +91,82 @@ pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeDial(
     host: JString,
     port: jint,
 ) -> jint {
-    if handle == 0 { return -1; }
+    if handle == 0 { return 0; }
     let rt: &crate::client::TorRuntime = unsafe { &*(handle as *const _) };
-    let host: String = match env.get_string(&host) { Ok(s) => s.into(), Err(_) => return -1 };
-    match rt.dial(&host, port as u16) {
-        Ok(()) => 0,
-        Err(e) => { log::error!("tor dial failed: {e}"); -1 }
+    let host: String = match env.get_string(&host) { Ok(s) => s.into(), Err(_) => return 0 };
+    match rt.dial_stream(&host, port as u16) {
+        Ok(id) => id as jint,
+        Err(e) => { log::error!("tor dial failed: {e}"); 0 }
     }
 }
 
-/// No-op for v1 (stream lifecycle lives on the Kotlin side).
+/// Close + drop the stream registered under `stream_id`. Idempotent
+/// on unknown ids. Called by Kotlin TorFlowForwarder on FIN-ACK / RST.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeClose(
     _env: JNIEnv,
     _cls: JClass,
-    _handle: jlong,
-    _stream_id: jlong,
-) -> jint { 0 }
+    handle: jlong,
+    stream_id: jlong,
+) -> jint {
+    if handle == 0 { return 0; }
+    let rt: &crate::client::TorRuntime = unsafe { &*(handle as *const _) };
+    let _ = rt.stream_close(stream_id as u64);
+    0
+}
 
 /// Read up to `buf.size` bytes from the arti DataStream identified by
 /// `stream_id`. Returns:
 ///   - bytes-read (positive) on success
 ///   - `-2` for "no data right now" — caller backs off briefly
 ///   - `-1` for EOF or any other error
-///
-/// **v0.1 ships the JNI surface** so the Kotlin TorFlowForwarder TCP
-/// state machine wires cleanly. The actual arti DataStream read /
-/// write path lives in `crate::client::stream_read` which v0.1 stubs
-/// as "always EOF" — the full TCP-over-Tor data path ships in M6.x
-/// once the arti `DataStream::read` async surface is wired through
-/// the tokio runtime owned by `TorRuntime`. The state-machine code
-/// above handles EOF gracefully (sends FIN-ACK to the device).
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeStreamRead(
-    _env: JNIEnv,
+    env: JNIEnv,
     _cls: JClass,
-    _handle: jlong,
-    _stream_id: jlong,
-    _buf: jni::objects::JByteArray,
-) -> jint { -1 }
+    handle: jlong,
+    stream_id: jlong,
+    buf: jni::objects::JByteArray,
+) -> jint {
+    if handle == 0 { return -1; }
+    let rt: &crate::client::TorRuntime = unsafe { &*(handle as *const _) };
+    let len = match env.get_array_length(&buf) { Ok(n) => n as usize, Err(_) => return -1 };
+    if len == 0 { return 0; }
+    let mut tmp = vec![0u8; len];
+    match rt.stream_read(stream_id as u64, &mut tmp) {
+        Ok(0) => -2,  // timeout — no data right now
+        Ok(n) => {
+            // Copy back into the JByteArray
+            // (JNI signed-byte view; safe because JVM bytes are u8 in this context)
+            let signed: &[i8] = unsafe { std::slice::from_raw_parts(tmp.as_ptr() as *const i8, n) };
+            if env.set_byte_array_region(&buf, 0, signed).is_err() { return -1; }
+            n as jint
+        }
+        Err(_) => -1,
+    }
+}
 
-/// Write `bytes` to the arti DataStream. Returns bytes-written
-/// (always == bytes.len() on the stub), or `-1` on error.
+/// Write `bytes` to the arti DataStream. Returns bytes-written on
+/// success, or `-1` on closed / unknown stream.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeStreamWrite(
     env: JNIEnv,
     _cls: JClass,
-    _handle: jlong,
-    _stream_id: jlong,
+    handle: jlong,
+    stream_id: jlong,
     bytes: jni::objects::JByteArray,
 ) -> jint {
-    env.get_array_length(&bytes).unwrap_or(-1)
+    if handle == 0 { return -1; }
+    let rt: &crate::client::TorRuntime = unsafe { &*(handle as *const _) };
+    let len = match env.get_array_length(&bytes) { Ok(n) => n as usize, Err(_) => return -1 };
+    if len == 0 { return 0; }
+    let mut buf = vec![0i8; len];
+    if env.get_byte_array_region(&bytes, 0, &mut buf).is_err() { return -1; }
+    let bytes_u8: &[u8] = unsafe { std::slice::from_raw_parts(buf.as_ptr() as *const u8, len) };
+    match rt.stream_write(stream_id as u64, bytes_u8) {
+        Ok(n) => n as jint,
+        Err(_) => -1,
+    }
 }
 
 /// Drop the runtime + tokio + arti client.

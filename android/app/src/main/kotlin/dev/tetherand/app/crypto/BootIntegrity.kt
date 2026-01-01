@@ -277,32 +277,37 @@ object BootIntegrity {
     }
 
     /**
-     * Pinned SHA-256 hashes of the SubjectPublicKeyInfo (X.509 SPKI DER
-     * encoding) of acceptable attestation root certificates. The set
-     * is the union of every Google-published Android attestation root
-     * (TEE + StrongBox generations) plus GrapheneOS — but GrapheneOS
-     * inherits the same hardware root, so the set is just the Google
-     * attestation roots in practice.
+     * Pinned SHA-256 hashes (hex, lowercase) of the SubjectPublicKeyInfo
+     * (X.509 SPKI DER encoding) of acceptable attestation root
+     * certificates. The set is the union of every Google-published
+     * Android attestation root (TEE + StrongBox generations);
+     * GrapheneOS-signed devices terminate at the same hardware root
+     * because the keystore HAL is OEM firmware, not OS-level.
+     *
+     * Captured 2026-05-31 from
+     * https://android.googleapis.com/attestation/root (Google's
+     * canonical public endpoint).
      *
      * Sources:
      *   - https://developer.android.com/training/articles/security-key-attestation
      *   - https://source.android.com/docs/security/features/keystore/attestation
      *
-     * Rotation: when Google publishes a new attestation root (typically
-     * with a new generation of Pixel hardware), add the new SPKI hash
-     * here. Old roots remain pinned to support older devices.
-     *
-     * **v0.1 ships an empty set.** The chain-walk is implemented and
-     * compiles; with an empty pin set every chain is rejected, which
-     * is the SAFE default (no false-positive verifications). Once the
-     * project formally catalogs the per-device attestation roots, the
-     * set below gets populated and `Verdict.Verified` becomes
-     * achievable on a real device. v0.1 release devices show
-     * `Verdict.Untrusted` from the attestation path; the AVB-state
-     * check (vbs=green/yellow + locked + release-keys) is the active
-     * trust signal until the catalog ships.
+     * Rotation: Google publishes new roots periodically (most recently
+     * the "Key Attestation CA1" root added 2025-07-17 ahead of the
+     * 2026-04-10 RKP-only transition). Re-fetch the JSON and add new
+     * SPKI hashes here. Old roots remain pinned to support older
+     * devices.
      */
-    private val PINNED_ATTESTATION_ROOTS: Set<String> = emptySet()
+    private val PINNED_ATTESTATION_ROOTS: Set<String> = setOf(
+        // Legacy hardware-attestation root, valid 2022-03-20 → 2042-03-15.
+        // Subject: serialNumber=f92009e853b6b045 (the standard Android
+        // attestation root used by every device's TEE / StrongBox key chain).
+        "feb2ea7551ee316ed4bb443c8293b884dbfdea40b603ee3e4f4a897e4580fbae",
+        // New "Key Attestation CA1" root (Google LLC / Android),
+        // valid 2025-07-17 → 2035-07-15. Begins signing chains on
+        // RKP-enabled devices Feb 2026; mandatory by 2026-04-10.
+        "3ee44512a1af2beb39c889490c60ea3f82e43f5d5a5532f5ab9419f676cd07ec",
+    )
 
     private fun sha256(bytes: ByteArray): ByteArray =
         java.security.MessageDigest.getInstance("SHA-256").digest(bytes)

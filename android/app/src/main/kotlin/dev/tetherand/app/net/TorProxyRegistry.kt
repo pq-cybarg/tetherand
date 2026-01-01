@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 object TorProxyRegistry {
     private val current = AtomicReference<Proxy?>(null)
+    private val bridgeRotation = AtomicReference<dev.tetherand.app.chain.BridgeRotation?>(null)
 
     /** Publish the current Arti SOCKS5 port. Call with `null` on Tor shutdown. */
     fun publish(socksPort: Int?) {
@@ -35,4 +36,15 @@ object TorProxyRegistry {
 
     /** Current Tor SOCKS5 proxy, or `null` if no Tor is running. */
     fun currentProxy(): Proxy? = current.get()
+
+    /** Publish the active [BridgeRotation] reference so UI cards can
+     *  surface it (and trigger `rotateNow()`) without holding their
+     *  own TorHop reference. Call with `null` on Tor shutdown. */
+    fun publishBridgeRotation(rot: dev.tetherand.app.chain.BridgeRotation?) {
+        bridgeRotation.set(rot)
+    }
+
+    /** Current bridge-rotation worker, or `null` if no Tor is running
+     *  OR the configured bridge set has fewer than 2 entries. */
+    fun currentBridgeRotation(): dev.tetherand.app.chain.BridgeRotation? = bridgeRotation.get()
 }

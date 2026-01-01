@@ -52,6 +52,13 @@ class TorHop(
     var socksPort: Int? = null
         private set
 
+    /** Periodic bridge-rotation worker. Lazy-instantiated on first
+     *  [start] when the configured bridge set has 2+ entries (since
+     *  rotation with only one bridge is a no-op). Lifetime is tied
+     *  to this TorHop instance — [stop] cancels it. */
+    var bridgeRotation: BridgeRotation? = null
+        private set
+
     override suspend fun start(input: Channel<ByteArray>): Channel<ByteArray> {
         _state.value = HopState.Connecting
         try {
@@ -81,6 +88,17 @@ class TorHop(
             // components (PublicBeacons, future tor-only fetchers) can
             // piggyback on this circuit instead of starting their own.
             dev.tetherand.app.net.TorProxyRegistry.publish(socksPort)
+            // Arm the bridge-rotation worker if the user configured 2+
+            // bridges. With <2 there's nothing to rotate to. Publish
+            // to TorProxyRegistry so UI cards can surface the handle
+            // without holding their own TorHop reference.
+            if (cfg.bridges.size >= 2) {
+                bridgeRotation = BridgeRotation(
+                    configProvider = { cfg },
+                    torHop = this,
+                ).also { it.start() }
+                dev.tetherand.app.net.TorProxyRegistry.publishBridgeRotation(bridgeRotation)
+            }
             _state.value = HopState.Connected
         } catch (t: Throwable) {
             _state.value = HopState.Error
@@ -112,6 +130,9 @@ class TorHop(
 
     override suspend fun stop() {
         _state.value = HopState.Stopping
+        try { bridgeRotation?.stop() } catch (_: Throwable) {}
+        bridgeRotation = null
+        dev.tetherand.app.net.TorProxyRegistry.publishBridgeRotation(null)
         try { forwarder?.stop() } catch (_: Throwable) {}
         forwarder = null
         if (handle != 0L) {
@@ -126,11 +147,22 @@ class TorHop(
     }
 
     /** Reachability probe — dials host:port through Tor. Returns true
-     *  on circuit success. UI uses this to sanity-check connectivity. */
+     *  on circuit success. UI uses this to sanity-check connectivity.
+     *  Note: nativeDial returns a stream_id on success (positive) and
+     *  0 on failure; the probe leaks the stream into the registry,
+     *  which is intentional for v1 — we don't have a dedicated
+     *  "dial + drop" JNI surface yet. The stream eventually times
+     *  out at the arti layer; a future patch can call nativeClose
+     *  on the returned id to be tidy. */
     fun probe(host: String, port: Int): Boolean {
         val h = handle
         if (h == 0L) return false
-        return nativeDial(h, host, port) == 0
+        val sid = nativeDial(h, host, port)
+        if (sid > 0) {
+            try { nativeClose(h, sid.toLong()) } catch (_: Throwable) {}
+            return true
+        }
+        return false
     }
 
     /** Snapshot of forwarder counters for the UI. */

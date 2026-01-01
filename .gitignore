@@ -18,3 +18,4 @@ build/
 /.pt-build/
 /.sdr-build/
 /android/app/src/main/jniLibs/**/*.so
+android/.kotlin/

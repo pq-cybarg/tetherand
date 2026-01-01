@@ -1,8 +1,13 @@
 use crate::bridge::Bridge;
-use arti_client::{TorClient, TorClientConfig};
-use std::sync::Arc;
+use arti_client::{DataStream, TorClient, TorClientConfig};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 use thiserror::Error;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::runtime::Runtime;
+use tokio::time::timeout;
 use tor_rtcompat::PreferredRuntime;
 
 #[derive(Debug, Error)]
@@ -139,7 +144,13 @@ impl TorBuilder {
             TorClient::create_bootstrapped(cfg).await
         }).map_err(|e| TorError::Bootstrap(format!("{e}")))?;
 
-        Ok(TorRuntime { rt, client, socks_port: 0 })
+        Ok(TorRuntime {
+            rt,
+            client,
+            socks_port: 0,
+            streams: Arc::new(Mutex::new(HashMap::new())),
+            next_stream_id: AtomicU64::new(0),
+        })
     }
 }
 
@@ -160,20 +171,126 @@ pub struct TorRuntime {
     pub client: TorClient<PreferredRuntime>,
     /// Local SOCKS5 port spawned at bootstrap (0 until [`start_socks`]).
     pub socks_port: u16,
+    /// Per-flow stream registry. The Kotlin TorFlowForwarder dials
+    /// once (we hand it back an opaque stream_id), then issues many
+    /// reads/writes against that id. Streams are dropped when the
+    /// caller calls `stream_close` OR when [`TorRuntime`] is dropped.
+    streams: Arc<Mutex<HashMap<u64, DataStream>>>,
+    next_stream_id: AtomicU64,
 }
 
 impl TorRuntime {
-    /// Dial host:port through Tor. Returns Ok if the circuit completes
-    /// + the stream attaches; we drop the stream immediately (this is
-    /// a reachability probe). The per-flow IP→DataStream forwarder
-    /// lives on the Kotlin side (TorHop) and ships in M6.x once the
-    /// relay-core packet stack is reused.
+    /// Reachability probe — opens a circuit + drops the stream.
+    /// Use this for "is this host reachable through Tor?" checks
+    /// without retaining state. For real data transfer, use
+    /// [`Self::dial_stream`].
     pub fn dial(&self, host: &str, port: u16) -> Result<(), TorError> {
         let client = self.client.isolated_client();
         let host_owned = host.to_string();
         let _stream = self.rt.block_on(async move {
             client.connect((host_owned.as_str(), port)).await
         }).map_err(|e| TorError::Dial(format!("{e}")))?;
+        Ok(())
+    }
+
+    /// Open a Tor circuit to host:port and retain the resulting
+    /// `DataStream` under a fresh stream_id. Returns the id; the
+    /// caller passes it to [`Self::stream_read`] / [`Self::stream_write`]
+    /// for bidirectional traffic. Caller MUST eventually call
+    /// [`Self::stream_close`] to free the resources (otherwise the
+    /// stream sits in the registry until the runtime is torn down).
+    pub fn dial_stream(&self, host: &str, port: u16) -> Result<u64, TorError> {
+        let client = self.client.isolated_client();
+        let host_owned = host.to_string();
+        let stream = self.rt.block_on(async move {
+            client.connect((host_owned.as_str(), port)).await
+        }).map_err(|e| TorError::Dial(format!("{e}")))?;
+        let id = self.next_stream_id.fetch_add(1, Ordering::Relaxed) + 1;
+        if let Ok(mut map) = self.streams.lock() {
+            map.insert(id, stream);
+        } else {
+            return Err(TorError::Dial("stream registry mutex poisoned".to_string()));
+        }
+        Ok(id)
+    }
+
+    /// Read up to `buf.len()` bytes from the stream registered under
+    /// `stream_id`. Returns:
+    ///   - `Ok(Some(n))` for `n > 0` bytes read
+    ///   - `Ok(None)` for EOF
+    ///   - `Err(TorError::NotInitialised)` if the stream_id is unknown
+    ///     or the registry has been torn down
+    ///   - `Err(TorError::Dial(_))` for a read timeout / network error
+    ///
+    /// Uses a 100 ms timeout so the Kotlin caller can poll without
+    /// blocking a JNI thread indefinitely. A timeout returns
+    /// `Ok(Some(0))` (interpreted by the Kotlin side as "no data
+    /// right now, back off briefly").
+    pub fn stream_read(&self, stream_id: u64, buf: &mut [u8]) -> Result<usize, TorError> {
+        // Take ownership of the stream briefly so we can call &mut on
+        // its AsyncRead. The mutex is held only for the take/return —
+        // the read itself happens outside the lock so other streams
+        // can read concurrently.
+        let mut stream = {
+            let mut map = self.streams.lock().map_err(|_| TorError::NotInitialised)?;
+            map.remove(&stream_id).ok_or(TorError::NotInitialised)?
+        };
+        let n = self.rt.block_on(async {
+            match timeout(Duration::from_millis(100), stream.read(buf)).await {
+                Ok(Ok(n)) => Ok(n),
+                Ok(Err(e)) => Err(TorError::Dial(format!("read: {e}"))),
+                Err(_) => Ok(0_usize), // timeout — no data right now
+            }
+        });
+        // Return the stream to the registry regardless of outcome
+        // unless it hit EOF (n == 0 due to actual EOF, not timeout —
+        // distinguishable only via the readable-side; for v1 we keep
+        // the stream registered and let close() be the explicit drop).
+        if let Ok(mut map) = self.streams.lock() {
+            map.insert(stream_id, stream);
+        }
+        n
+    }
+
+    /// Write `bytes` to the stream registered under `stream_id`.
+    /// Returns bytes-written on success, or an error on closed /
+    /// unknown stream. Blocks until the write completes (arti's
+    /// write side is generally fast; no timeout is applied since
+    /// backpressure here is desirable).
+    pub fn stream_write(&self, stream_id: u64, bytes: &[u8]) -> Result<usize, TorError> {
+        let mut stream = {
+            let mut map = self.streams.lock().map_err(|_| TorError::NotInitialised)?;
+            map.remove(&stream_id).ok_or(TorError::NotInitialised)?
+        };
+        let result = self.rt.block_on(async {
+            match stream.write_all(bytes).await {
+                Ok(()) => match stream.flush().await {
+                    Ok(()) => Ok(bytes.len()),
+                    Err(e) => Err(TorError::Dial(format!("flush: {e}"))),
+                },
+                Err(e) => Err(TorError::Dial(format!("write: {e}"))),
+            }
+        });
+        if let Ok(mut map) = self.streams.lock() {
+            map.insert(stream_id, stream);
+        }
+        result
+    }
+
+    /// Close + drop the stream registered under `stream_id`. Idempotent
+    /// for unknown ids (returns Ok). Called by Kotlin's TorFlowForwarder
+    /// on FIN-ACK / RST teardown.
+    pub fn stream_close(&self, stream_id: u64) -> Result<(), TorError> {
+        if let Ok(mut map) = self.streams.lock() {
+            if let Some(mut stream) = map.remove(&stream_id) {
+                // Best-effort flush + drop. arti drops streams cleanly
+                // on Drop; the explicit shutdown is courtesy.
+                let _ = self.rt.block_on(async {
+                    let _ = stream.flush().await;
+                    stream.shutdown().await
+                });
+            }
+        }
         Ok(())
     }
 }

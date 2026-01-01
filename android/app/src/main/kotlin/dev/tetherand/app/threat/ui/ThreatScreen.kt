@@ -73,6 +73,12 @@ fun ThreatScreen() {
         dev.tetherand.app.hardened.ui.HardenedSection()
         dev.tetherand.app.hardened.deadman.DeadmansCard()
         dev.tetherand.app.hardened.selfie.SelfieCard()
+        // M11.x bridge-rotation card — no-ops when no Tor circuit
+        // is up (or fewer than 2 configured bridges). Sits with
+        // the other Hardened-Mode controls.
+        dev.tetherand.app.chain.BridgeRotationCard(
+            dev.tetherand.app.net.TorProxyRegistry.currentBridgeRotation()
+        )
         dev.tetherand.app.hardened.ui.IncidentResponseCard()
         // Heuristic suppressions (acknowledge known-acceptable risks).
         dev.tetherand.app.threat.heuristic.SuppressionsCard()
