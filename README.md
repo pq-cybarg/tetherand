@@ -9,15 +9,18 @@ and `docs/superpowers/plans/` for per-milestone implementation plans.
 
 - **M0** (DEFCON pre-flight playbook + scripts): **shipped**. Run `./tutorial.sh` → http://localhost:7331/.
 - **M1** (Tether MVP — Apache-2.0 forked relay + custom-branded APK): **shipped**.
-- **M2-M10**: planned. See spec.
+- **M3** (Privacy Chain core + WireGuard hop via BoringTun JNI): **shipped**.
+- **M2, M4-M10**: planned. See spec.
 
 ## Build
 
 ```bash
-make build        # builds bin/tetherand (arm64 Mach-O) + bin/tetherand.apk
+make build        # builds bin/tetherand + bin/tetherand.apk (cross-compiles libtetherand_wg.so for the chain)
+make native-wg    # just rebuild the WireGuard native lib for arm64-android
 make install      # installs APK on the connected device + pre-grants VPN consent
 make smoke        # end-to-end test (ping + DNS through the tether)
-make test         # all Rust unit tests
+make chain        # alias of build (chain ships in the same APK)
+make test         # all Rust unit tests (codec, relay-core, wg + parser/handshake tests)
 make release      # signed-release APK (debug key for now; production key in M8)
 make clean        # cargo clean + gradle clean + remove bin/ artifacts
 ```

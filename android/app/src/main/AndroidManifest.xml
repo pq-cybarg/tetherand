@@ -47,5 +47,21 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="reverse_tethering"/>
         </service>
+
+        <!-- M3: Privacy Chain VpnService. Parallel to TetherandService;
+             only one VpnService can be active at a time and the user
+             picks via the UI tab. -->
+        <service
+            android:name=".service.TetherandChainService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.VpnService"/>
+            </intent-filter>
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="privacy_chain"/>
+        </service>
     </application>
 </manifest>
