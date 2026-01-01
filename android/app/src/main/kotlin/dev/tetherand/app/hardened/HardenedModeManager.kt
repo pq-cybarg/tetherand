@@ -59,6 +59,11 @@ class HardenedModeManager(private val ctx: Context) {
         // cleared on entry. They can re-enable individual ones after
         // confirming the conference environment is benign.
         ThreatSuppressions(ctx).clearAll()
+        // 4e. Also wipe the public-beacon clear-net fallback policy.
+        // Hardened Mode is "Tor or nothing" for the beacon sources
+        // by default; the user can re-enable the fallback if they
+        // want to, but it has to be a fresh deliberate choice.
+        dev.tetherand.app.crypto.BeaconPolicy.get(ctx).clear()
         // 5. Persist + emit state.
         store.active = true
         _state.value = true

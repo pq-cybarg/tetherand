@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    5364C13D-posture network security policy.
+
+    Defaults:
+      * cleartextTrafficPermitted = false (no plaintext HTTP anywhere)
+      * Only system trust anchors (no user-added CAs honored in debug
+        or release; defeats user-installed MITM CA trojans)
+
+    Per-domain hardening:
+      * Pinned hosts get a pin set declared HERE for system-level
+        enforcement, in addition to the OkHttp-level pin in
+        dev.tetherand.app.net.PinnedHttp. Belt and braces — both
+        must accept for the connection to succeed.
+      * Pin expiration matches the leaf cert expiration window.
+        Re-capture during the next scheduled crypto-hygiene pass.
+
+    To dump pins in the format expected here:
+        openssl s_client -connect <host>:443 -servername <host> </dev/null \
+          | openssl x509 -pubkey -noout \
+          | openssl pkey -pubin -outform DER \
+          | openssl dgst -sha256 -binary \
+          | openssl enc -base64
+-->
+<network-security-config>
+
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">api.mullvad.net</domain>
+        <pin-set expiration="2027-05-30">
+            <pin digest="SHA-256">xuCt+G/2Y4qQjtBXZb81VbODvYIKkc6etfPZb4pic4E=</pin>
+        </pin-set>
+        <trust-anchors><certificates src="system"/></trust-anchors>
+    </domain-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">api.pwnedpasswords.com</domain>
+        <pin-set expiration="2027-05-30">
+            <pin digest="SHA-256">9IwmXwvi5X2PS4f4WyChoe7zqc+804o3cHd42i9C/QA=</pin>
+        </pin-set>
+        <trust-anchors><certificates src="system"/></trust-anchors>
+    </domain-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">haveibeenpwned.com</domain>
+        <pin-set expiration="2027-05-30">
+            <pin digest="SHA-256">VgvnWRjPVQSn3Nu/iTPWsgPdGDJqsy+3XCnmPIJEBpE=</pin>
+        </pin-set>
+        <trust-anchors><certificates src="system"/></trust-anchors>
+    </domain-config>
+
+    <!-- drand (League of Entropy) HTTP API. SeekerRng absorbs the
+         latest round's randomness field as one of two public-beacon
+         sources. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">api.drand.sh</domain>
+        <pin-set expiration="2027-05-30">
+            <pin digest="SHA-256">xA2Dca6ZBfoxQH3BYbwvmrXj4UjQs/P7wyaDeDZvym0=</pin>
+        </pin-set>
+        <trust-anchors><certificates src="system"/></trust-anchors>
+    </domain-config>
+
+    <!-- NIST Interoperable Randomness Beacon v2.0. SeekerRng
+         absorbs the latest pulse's outputValue field as the second
+         public-beacon source (different operator + different
+         cryptosystem from drand). -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">beacon.nist.gov</domain>
+        <pin-set expiration="2027-05-30">
+            <pin digest="SHA-256">smFZmtvzXcZ6MUUGqbkes77ywMVHmkirJ1QepFwPaoM=</pin>
+        </pin-set>
+        <trust-anchors><certificates src="system"/></trust-anchors>
+    </domain-config>
+
+    <debug-overrides>
+        <!--
+            Even in debug builds, do NOT trust user-installed CAs. This
+            blocks the common "MITM proxy with my own root" debugging
+            shortcut — which is the exact shape of a hostile-environment
+            attacker dropping a CA onto a borrowed device.
+        -->
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </debug-overrides>
+
+</network-security-config>

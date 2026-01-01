@@ -33,6 +33,9 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
         <!-- Visible Compose entry point (icon launcher) -->
@@ -46,10 +49,24 @@
         </activity>
 
         <!-- Invisible CLI-invocable activity: receives START / STOP intents
-             from the host-side `tetherand` binary. -->
+             from the host-side `tetherand` binary via `adb shell am ...`.
+             It cannot be gated by a signature-level permission because
+             the adb `shell` user (UID 2000) is not signed with our
+             certificate. Instead we enforce a runtime caller-identity
+             check in TetherandActivity.onCreate that narrows acceptable
+             callers to:
+               (a) our own package (self-launched via Intent)
+               (b) android.shell (adb-driven CLI flow)
+               (c) android.systemui (Quick Settings tile)
+             Anything else is finish()'d before the intent extras are
+             parsed. We also strip from recents + noHistory so the
+             activity never lingers in the task stack as a launch
+             vector. -->
         <activity
             android:name=".TetherandActivity"
             android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
             android:theme="@android:style/Theme.NoDisplay">
             <intent-filter>
                 <action android:name="dev.tetherand.app.START"/>
@@ -99,10 +116,14 @@
         </service>
 
         <!-- M2: USB Open Accessory receiver. Wakes when the host (Mac)
-             switches the Seeker into accessory mode via control transfers. -->
+             switches the Seeker into accessory mode via control transfers.
+             USB_ACCESSORY_ATTACHED is a privileged system broadcast —
+             only the platform USB stack can fire it. We keep
+             exported=false because no userspace caller has any
+             legitimate reason to invoke this service. -->
         <service
             android:name=".transport.AoaAccessoryService"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED"/>
             </intent-filter>

@@ -21,11 +21,19 @@ futures = "0.3"
 # + ChaCha20-Poly1305 cell framing.
 curve25519-dalek = { version = "4", features = ["digest", "rand_core"] }
 sha2 = "0.10"
+# SHA-3 / SHAKE-256 for the secure_rng entropy mixer (FIPS-202).
+sha3 = "0.10"
+# Zeroize for explicit key-material wipe.
+zeroize = { version = "1.8", features = ["zeroize_derive"] }
 hmac = "0.12"
 hkdf = "0.12"
 chacha20poly1305 = { version = "0.10", features = ["alloc"] }
 rand = "0.8"
 rand_core = "0.6"
+# getrandom is the lowest-level entropy source we mix; rand_core's
+# OsRng wraps it but exposing it directly lets secure_rng absorb it
+# without going through rand's higher-level abstractions.
+getrandom = "0.2"
 subtle = "2"
 hex = "0.4"
 

@@ -32,7 +32,6 @@ use chacha20poly1305::{ChaCha20Poly1305, Nonce};
 use curve25519_dalek::montgomery::MontgomeryPoint;
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
-use rand::RngCore;
 use sha2::Sha256;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -84,12 +83,20 @@ pub async fn dial(target: Target, args: HashMap<String, String>, mut arti_sock: 
     // tracked in obfs4-spec §3.2 — v1 emits a valid X25519 public key
     // bytes as the repr surface, which interoperates with the existing
     // lyrebird server-side that accepts any 32-byte string.
+    //
+    // The client_secret is the X25519 *private key* for this
+    // handshake — biased entropy here means an attacker can recover
+    // session keys. We pull from secure_rng (SHAKE-256-mixed over
+    // four sources) rather than rand::thread_rng().
     let mut client_secret = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut client_secret);
+    crate::secure_rng::fill(&mut client_secret);
     client_secret[0] &= 248;
     client_secret[31] &= 127;
     client_secret[31] |= 64;
     let client_public = MontgomeryPoint::mul_base_clamped(client_secret).to_bytes();
+    // We deliberately do NOT wipe client_secret here — it's used
+    // again below in the ntor key derivation. Wipe happens after the
+    // session keys are derived.
 
     // M_c = HMAC-SHA256(server_public ‖ node_id, client_public)[:32]
     let mut mac_key = Vec::with_capacity(32 + 20);
@@ -97,10 +104,13 @@ pub async fn dial(target: Target, args: HashMap<String, String>, mut arti_sock: 
     mac_key.extend_from_slice(&cert.node_id);
     let m_c = hmac_sha256(&mac_key, &client_public);
 
-    // Random padding 0..8192 bytes per spec.
-    let pad_len = (rand::random::<u16>() % 8192) as usize;
+    // Random padding 0..8192 bytes per spec. Use rejection-sampled
+    // u16 to avoid the modulo bias of `random::<u16>() % 8192`
+    // (8192 IS a power of two so the bias is zero today, but the
+    // spec value can change; rejection sampling is robust to that).
+    let pad_len = crate::secure_rng::next_u16_below(8192) as usize;
     let mut padding = vec![0u8; pad_len];
-    rand::thread_rng().fill_bytes(&mut padding);
+    crate::secure_rng::fill(&mut padding);
 
     // Epoch-hour string.
     let epoch_hour = (SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e| e.to_string())?

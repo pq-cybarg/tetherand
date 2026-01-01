@@ -8,6 +8,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import android.util.Log
+import dev.tetherand.app.crypto.BootIntegrity
+import dev.tetherand.app.crypto.SeekerRng
 import dev.tetherand.app.service.TetherandChainService
 import dev.tetherand.app.ui.TabbedRoot
 import dev.tetherand.app.ui.TetherandTheme
@@ -29,6 +32,27 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Install the SHAKE-256 entropy mixer as the JVM-default
+        // SecureRandom for the process BEFORE any code that touches
+        // crypto (BouncyCastle init, key generation, JCA Signature
+        // instantiation, OkHttp TLS handshake nonces, etc.). This
+        // call is idempotent and survives configuration changes.
+        SeekerRng.installAsDefault(this)
+        // Boot-integrity / AVB check. We accept stock OEM-signed
+        // (vbs=green) AND GrapheneOS-style user-rooted (vbs=yellow)
+        // — both are bootloader-locked. The verdict is surfaced as
+        // a Critical alert on the Threat tab if it indicates a
+        // tampered or unlocked device. We log the verdict at startup
+        // for support; the explanation field is one line and
+        // contains no PII.
+        try {
+            val r = BootIntegrity.check(this)
+            Log.i("BootIntegrity", "verdict=${r.verdict} (${r.explanation})")
+        } catch (t: Throwable) {
+            // Never let a failed boot-integrity check crash startup;
+            // the threat-tab surface remains visible to the user.
+            Log.w("BootIntegrity", "check failed: ${t.javaClass.simpleName}")
+        }
         enableEdgeToEdge()
         // M7a: kick the threat-detection foreground service. Idempotent —
         // Android handles "already running" by routing to onStartCommand

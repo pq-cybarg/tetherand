@@ -1,7 +1,22 @@
 package dev.tetherand.app.chain
 
 import android.util.Base64
+import java.util.Arrays
 
+/**
+ * WireGuard configuration. Carries key material in `ByteArray`s
+ * because the underlying JNI takes byte[]; we cannot use
+ * `SecureBytes` for the live JNI handoff (the foreign code expects
+ * the raw array). We compensate by exposing [zeroize] — the caller
+ * MUST invoke it after the config has been consumed by the JNI
+ * `WireGuardHop.start()` call. The pattern is:
+ *
+ *     val cfg = WireGuardConfig.parse(text)
+ *     try { hop.start(cfg) } finally { cfg.zeroize() }
+ *
+ * After `zeroize()` the key arrays are full of zeros and the config
+ * is no longer usable.
+ */
 data class WireGuardConfig(
     val privateKey: ByteArray,            // 32 bytes
     val address: String,                  // e.g. "10.66.0.2/32"
@@ -22,17 +37,42 @@ data class WireGuardConfig(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is WireGuardConfig) return false
-        return privateKey.contentEquals(other.privateKey) &&
+        return constantTimeEq(privateKey, other.privateKey) &&
             address == other.address &&
             dns == other.dns &&
-            peerPublicKey.contentEquals(other.peerPublicKey) &&
-            (presharedKey?.contentEquals(other.presharedKey ?: ByteArray(0)) ?: (other.presharedKey == null)) &&
+            constantTimeEq(peerPublicKey, other.peerPublicKey) &&
+            constantTimeEqNullable(presharedKey, other.presharedKey) &&
             allowedIps == other.allowedIps &&
             endpointHost == other.endpointHost &&
             endpointPort == other.endpointPort &&
             persistentKeepaliveSecs == other.persistentKeepaliveSecs
     }
     override fun hashCode(): Int = address.hashCode() * 31 + endpointHost.hashCode()
+
+    /**
+     * Wipe all key material in place. Idempotent. After this call the
+     * config object still exists but the key arrays are zeroed; any
+     * subsequent use will hand the JNI a useless config (rejected
+     * by the noise-protocol handshake).
+     */
+    fun zeroize() {
+        Arrays.fill(privateKey, 0)
+        Arrays.fill(peerPublicKey, 0)
+        presharedKey?.let { Arrays.fill(it, 0) }
+    }
+
+    private fun constantTimeEq(a: ByteArray, b: ByteArray): Boolean {
+        if (a.size != b.size) return false
+        var diff = 0
+        for (i in a.indices) diff = diff or (a[i].toInt() xor b[i].toInt())
+        return diff == 0
+    }
+
+    private fun constantTimeEqNullable(a: ByteArray?, b: ByteArray?): Boolean {
+        if (a == null && b == null) return true
+        if (a == null || b == null) return false
+        return constantTimeEq(a, b)
+    }
 
     companion object {
         @Throws(IllegalArgumentException::class)

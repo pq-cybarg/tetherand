@@ -77,6 +77,10 @@ class TorHop(
             // same port; for now it's the user-facing surface.
             val sp = nativeStartSocks(handle)
             socksPort = if (sp > 0) sp else null
+            // Publish the SOCKS port to the app-wide registry so other
+            // components (PublicBeacons, future tor-only fetchers) can
+            // piggyback on this circuit instead of starting their own.
+            dev.tetherand.app.net.TorProxyRegistry.publish(socksPort)
             _state.value = HopState.Connected
         } catch (t: Throwable) {
             _state.value = HopState.Error
@@ -106,6 +110,10 @@ class TorHop(
             try { nativeShutdown(handle) } catch (_: Throwable) {}
             handle = 0L
         }
+        // Retract from the app-wide registry so consumers stop trying
+        // to route through a torn-down circuit.
+        socksPort = null
+        dev.tetherand.app.net.TorProxyRegistry.publish(null)
         _state.value = HopState.Idle
     }
 

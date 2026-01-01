@@ -205,16 +205,37 @@ fn encode_daita_actions(actions: Vec<crate::PaddingAction>) -> Vec<u8> {
     out
 }
 
+/// Maximum number of DAITA machines we accept per scheduler. The
+/// Mullvad-published machine set ships with ~10 entries today; we cap
+/// at 128 to reject obvious DoS attempts where a hostile JNI caller
+/// passes a 10M-element array and exhausts memory before we even
+/// validate the contents.
+const MAX_DAITA_MACHINES: usize = 128;
+/// Maximum bytes per individual machine definition. DAITA machines
+/// are compact state-machine descriptions; the upstream set's largest
+/// is ~4 KB. We cap at 64 KB per machine which leaves headroom for
+/// experimental machines without enabling a 1-GB per-machine DoS.
+const MAX_DAITA_MACHINE_BYTES: usize = 64 * 1024;
+
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_tetherand_app_chain_WireGuardHop_nativeDaitaNew(
     mut env: JNIEnv, _class: JClass,
     machines: jni::objects::JObjectArray,
 ) -> jlong {
-    let n = match env.get_array_length(&machines) { Ok(v) => v as usize, Err(_) => return 0 };
+    let n = match env.get_array_length(&machines) {
+        Ok(v) if (v as usize) <= MAX_DAITA_MACHINES => v as usize,
+        Ok(_) => return 0,   // over-cap — reject without allocating
+        Err(_) => return 0,
+    };
     let mut owned: Vec<Vec<u8>> = Vec::with_capacity(n);
     for i in 0..n {
-        let elem = match env.get_object_array_element(&machines, i as i32) { Ok(o) => o, Err(_) => return 0 };
+        let elem = match env.get_object_array_element(&machines, i as i32) {
+            Ok(o) => o, Err(_) => return 0
+        };
         let arr: JByteArray = elem.into();
+        // Per-element length check BEFORE copy_jba allocates.
+        let elem_len = env.get_array_length(&arr).unwrap_or(0) as usize;
+        if elem_len > MAX_DAITA_MACHINE_BYTES { return 0; }
         owned.push(copy_jba(&mut env, &arr));
     }
     let refs: Vec<&[u8]> = owned.iter().map(|v| v.as_slice()).collect();

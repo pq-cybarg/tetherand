@@ -1,14 +1,13 @@
 package dev.tetherand.app.mullvad
 
+import dev.tetherand.app.net.PinnedHttp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.TimeUnit
 
 class MullvadApiException(msg: String) : RuntimeException(msg)
 
@@ -16,10 +15,11 @@ class MullvadApi(
     private val baseUrl: String = "https://api.mullvad.net",
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-    private val http = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    // Pinned to api.mullvad.net's SPKI; system CA store still required
+    // as a baseline check. See PinnedHttp + network_security_config.xml.
+    // A CA compromise alone cannot inject a substitute cert — the
+    // attacker also needs Mullvad's private key.
+    private val http = PinnedHttp.client()
     private val jsonMedia = "application/json".toMediaType()
 
     suspend fun login(accountNumber: String): MullvadLoginResponse = withContext(Dispatchers.IO) {

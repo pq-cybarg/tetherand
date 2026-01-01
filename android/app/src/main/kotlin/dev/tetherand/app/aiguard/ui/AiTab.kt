@@ -81,6 +81,7 @@ fun AiTab() {
         EgressWatchCard()
         VerifyCallerCard()
         OsintCard()
+        dev.tetherand.app.crypto.BeaconPolicyCard()
         FieldGuideCard()
     }
 }

@@ -29,6 +29,10 @@ import kotlinx.coroutines.withContext
 @Composable
 fun OsintCard() {
     val scope = rememberCoroutineScope()
+    // The password lives only on the UI thread, in a TextField that
+    // requires a `String` for IME interop. We treat the String as a
+    // transient credential: best-effort wiped via reflection as soon
+    // as the check completes, AND the form is cleared.
     var password by remember { mutableStateOf("") }
     var status by remember { mutableStateOf<String?>(null) }
     var running by remember { mutableStateOf(false) }
@@ -44,16 +48,29 @@ fun OsintCard() {
             OutlinedTextField(
                 value = password, onValueChange = { password = it },
                 modifier = Modifier.fillMaxWidth(),
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                 label = { Text("password to check (not transmitted)", fontSize = 10.sp) },
             )
             Button(modifier = Modifier.fillMaxWidth(), enabled = !running, onClick = {
                 running = true
                 scope.launch {
-                    val r = withContext(Dispatchers.IO) { OsintExposureProbe.isPasswordPwned(password) }
+                    val captured = password
+                    // Drop the Compose-state copy immediately so the
+                    // form clears even if the network call hangs.
+                    password = ""
+                    val r = try {
+                        withContext(Dispatchers.IO) { OsintExposureProbe.isPasswordPwned(captured) }
+                    } finally {
+                        // Wipe the captured-String value field via
+                        // reflection. Best-effort: the String may
+                        // have been interned, and recomposition may
+                        // hold another copy. Both narrow but do not
+                        // close the heap-residency window.
+                        dev.tetherand.app.crypto.SecureBytes.bestEffortWipeString(captured)
+                    }
                     status = if (r.pwned) "PWNED — seen in ${r.occurrences} breaches. Rotate now."
                              else "Not seen in HIBP."
                     running = false
-                    password = ""
                 }
             }) { Text(if (running) "Checking…" else "Check", fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
             if (status != null) {

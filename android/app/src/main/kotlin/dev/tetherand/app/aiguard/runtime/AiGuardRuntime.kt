@@ -40,7 +40,15 @@ class AiGuardRuntime private constructor(private val ctx: Context) {
     fun loadAll() {
         val out = ModelBundle.ALL.map { resolveModel(it) }
         _statuses.value = out
-        Log.i("AiGuardRuntime", "model bundle: " + out.joinToString { "${it.id}=${it.state}" })
+        // Redact: only emit aggregate counts. Detailed per-model state
+        // is available through the UI for the user; logging the
+        // model-by-model state to logcat would tell an adversary
+        // exactly which classifier is or isn't loaded — useful for
+        // tailoring an evasion strategy.
+        val loaded     = out.count { it.state == ModelStatus.State.Loaded }
+        val notPresent = out.count { it.state == ModelStatus.State.NotPresent }
+        val failed     = out.count { it.state == ModelStatus.State.LoadFailed }
+        Log.i("AiGuardRuntime", "model bundle: $loaded loaded, $notPresent absent, $failed failed")
     }
 
     /** Single-model resolver: prefers a downloaded copy under
