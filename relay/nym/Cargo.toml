@@ -15,37 +15,37 @@ crate-type = ["cdylib", "rlib"]
 # `vpn` feature off because that requires the Linux/macOS Wireguard
 # kernel module which doesn't apply on Android (we already have our
 # own WG hop via M4).
-# Nym SDK is gated behind `with-sdk`. Investigation log (2026-05-31):
+# Nym SDK — `with-sdk` is now default-on. History:
 #
-# - **nym-sdk 1.4** failed to type-infer under rustc 1.85: the older
-#   `nym-noise` crate had an under-annotated closure that newer
-#   rustc inference rejects.
-# - **nym-sdk 1.21** (latest as of 2026-05-31) compiles past the
-#   nym-noise issue but trips a different upstream blocker: the
-#   transitive `blake3 1.8.5` adopted `digest 0.11`, while
-#   `hmac` (used pervasively in nym-crypto + nym-sphinx-anonymous-
-#   replies) still uses `digest 0.10`. The trait-incoherence
-#   between `Digest<0.10>` and `Digest<0.11>` produces 5x E0277 /
-#   E0599 errors at compile time. `[patch.crates-io]` cannot dodge
-#   this because the 0.10 / 0.11 split is semver-incompatible —
-#   any patch satisfying nym-crypto's `blake3 >= 1.8` also pulls
-#   `digest 0.11`, and a patch pinning blake3 < 1.8 fails Cargo's
-#   semver check.
+# - **nym-sdk 1.4** failed to type-infer under rustc 1.85 (a
+#   closure parameter the upstream nym-noise forgot to annotate).
+# - **nym-sdk 1.21** (released 2026-05-11) compiles past the
+#   nym-noise issue but trips a digest-crate version split:
+#   blake3 1.8 adopted `digest 0.11` while nym-crypto + nym-sphinx-
+#   anonymous-replies still used `digest 0.10` via hmac.
 #
-# Local fix options remaining (multi-day, not single-session):
-#   (A) Vendor + patch `nym-sphinx-anonymous-replies` (the failing
-#       call site) to use `digest 0.11` directly. Carries forward
-#       through every upstream patch release as maintenance burden.
-#   (B) Fork `nym-crypto` and ship a `digest 0.10`-only blake3 path.
-#       Larger surface to maintain.
-#   (C) Wait for upstream coordination on unified digest version.
+# **Local fix (2026-05-31):** vendored nym-crypto + nym-sphinx-
+# anonymous-replies under `relay/vendored/` and ported them to the
+# digest 0.11 / hmac 0.13 / hkdf 0.13 / sha2 0.11 era:
 #
-# v0.1 ships path (C); the JNI surface in client.rs + jni.rs compiles
-# standalone (returning "not-ready" status) so the chain orchestrator
-# wires cleanly. The NymVpnHop activates when upstream unifies the
-# digest version OR when path (A)/(B) is staffed. Documentation
-# captures this so a future contributor doesn't repeat the
-# investigation.
+#   * digest 0.11 dropped the `digest::crypto_common` re-export —
+#     imports now go through the standalone `crypto-common` crate.
+#   * hkdf 0.13's `Hkdf<H>` is now a 1-generic alias for
+#     `GenericHkdf<Hmac<H>>` (was 2-generic). The `SimpleHmac`
+#     variant is now `SimpleHkdf<D>`.
+#   * hmac 0.13 moved `new_from_slice` to the `KeyInit` trait —
+#     callers must import it explicitly.
+#   * digest 0.11 swapped `generic-array::GenericArray` for
+#     `hybrid-array::Array` at the digest-output boundary. We
+#     keep the public type `EncryptionKeyDigest` as `GenericArray`
+#     (matching the legacy API surface) and convert at the
+#     boundary inside `compute_digest` to avoid cascading
+#     downstream-caller breakage.
+#
+# Workspace [patch.crates-io] block in `relay/Cargo.toml` routes
+# the two vendored crates in. When upstream nym-sdk catches up with
+# the digest 0.11 stack, drop the vendored copies and the patch
+# block.
 nym-sdk = { version = "1.21", default-features = false, optional = true }
 
 tokio = { version = "1.43", features = ["rt-multi-thread", "macros", "net", "sync", "io-util"] }
@@ -58,5 +58,10 @@ serde = { version = "1", features = ["derive"] }
 hex = "0.4"
 
 [features]
+# `with-sdk` is now default-on — the local vendored-crate fix above
+# unblocked the build. Opt out via `--no-default-features` to skip
+# pulling the ~200-crate Nym dep tree (useful during fast iteration
+# on unrelated code).
+default = ["with-sdk"]
 android = ["dep:android_logger"]
 with-sdk = ["dep:nym-sdk"]

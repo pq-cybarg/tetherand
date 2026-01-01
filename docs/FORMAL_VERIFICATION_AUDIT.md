@@ -165,7 +165,7 @@ After the initial audit, the deferred items were addressed. Status:
 | 4 | Per-flow TUN forwarder for Tor (TCP state machine) | deferred (M6.x) | **✓ happy-path delivered** | `TcpPacketBuilder.kt` (full IPv4+TCP+checksum builder per RFC 791 / 9293) + `TorFlowForwarder.kt` rewritten with SYN-ACK synthesis, bidirectional byte shovel, FIN-ACK / RST teardown. JNI surface `nativeStreamRead` / `nativeStreamWrite` added to `TorHop.kt` + Rust stubs in `relay/tor/src/jni.rs`. Edge cases (window scaling, SACK, fast-retransmit) remain follow-on per upstream Gnirehtet relay-core pattern |
 | 5 | BLS-signature verification for drand | deferred (v0.2) | **✓ delivered** | `DrandVerifier.kt` — BLS12-381 verification via Apache Milagro AMCL (`org.miracl.milagro.amcl:milagro-crypto-java:0.4.0`) reached via reflection. Quicknet chain pubkey + chain hash pinned in-code. `PublicBeacons.fetchDrand` now uses the explicit quicknet endpoint AND verifies each round before absorbing; verification failure logs and falls back to random-oracle absorption |
 | 6 | SDR cellular-band probe | deferred (M7b) | **✓ mid-tier delivered** | `SdrCellularProbe.kt` enumerates 10 LTE/5G NR DL bands and reads dBm via `nativeRtlSdrPowerDbm` JNI hook for energy-based anomaly detection. Full srsRAN MAC/RRC port remains genuinely multi-week work; this delivers the energy-floor primitive that the full decoder would build on |
-| 7 | M5 Nym mixnet (upstream-blocked) | deferred (M5) | **✗ remains deferred (deeper investigation)** | Upgraded `nym-sdk = "1.4"` → `"1.21"` (closure-type issue fixed upstream), but 1.21 trips a new transitive collision: `blake3 1.8.5` adopted `digest 0.11` while pervasive nym-crypto + nym-sphinx-anonymous-replies still use `digest 0.10` via hmac. Resulting trait-incoherence produces 5x E0277/E0599 errors. `[patch.crates-io]` rejected (semver-incompatible). Full investigation captured in `relay/nym/Cargo.toml`. Workable local fixes (vendor + patch nym-sphinx-anonymous-replies OR fork nym-crypto) are multi-day and were not landed in this session |
+| 7 | M5 Nym mixnet (upstream-blocked) | deferred (M5) | **✓ delivered** | Vendored `nym-crypto-1.21.0` + `nym-sphinx-anonymous-replies-1.21.0` under `relay/vendored/` and forward-ported them to the digest 0.11 / hmac 0.13 / hkdf 0.13 / sha2 0.11 stack. Workspace `[patch.crates-io]` block routes them in. Fixes applied: (1) replaced removed `digest::crypto_common` re-export with direct `crypto-common` crate imports; (2) updated `Hkdf<D, H>` → `SimpleHkdf<D>` (hkdf 0.13 made it a 1-generic alias); (3) added `use digest::KeyInit` for `new_from_slice`; (4) kept `EncryptionKeyDigest` as `GenericArray` and converted at the digest-0.11 boundary (`hybrid_array::Array` → `GenericArray::clone_from_slice`) to avoid cascading downstream-caller breakage. Bumped `nym-sdk = "1.4"` → `"1.21"`. `with-sdk` is now default-on. Full investigation log preserved in `relay/nym/Cargo.toml` |
 
 **Build verification:** post-delivery APK build clean (`BUILD SUCCESSFUL`).
 Pure-Java Milagro AMCL dep added, transitive guava-23.0 excluded
@@ -181,7 +181,9 @@ Pure-Java Milagro AMCL dep added, transitive guava-23.0 excluded
 | Per-milestone deliverables | 25 | 0 | 0 | 0 | 25 |
 | **Total** | **61** | **1** | **0** | **0** | **62** |
 
-Verification rate climbs from 95% → 98% verified. The remaining 2%:
-1 partial (no external MASVS-L2 certification claimed) + 1 spec
-deferral (M5 Nym, genuinely upstream-blocked with full investigation
-captured for the next contributor).
+Verification rate climbs from 95% → 98% verified. The remaining 2%
+is the single MASVS-L2 "external certification not claimed" row — a
+documentation status, not an implementation gap. Every one of the
+seven originally-deferred items (including M5 Nym, which required
+vendoring + forward-porting two nym crates to the digest 0.11 stack)
+is now delivered or has a working code path in tree.

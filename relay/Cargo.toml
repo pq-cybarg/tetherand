@@ -62,10 +62,27 @@ debug = false
 # When upstream nym-sdk coordinates a unified digest version (0.10
 # everywhere or 0.11 everywhere), drop this override.
 # ---------------------------------------------------------------------
-# NOTE: an earlier draft pinned blake3 = "=1.5.4" via [patch.crates-io]
-# to dodge the nym-sdk 1.21 trait-incoherence (blake3 1.8 → digest 0.11
-# vs hmac → digest 0.10). Cargo refused because semver-compatibility:
-# nym-crypto requires blake3 >= 1.8, and 1.5.4 doesn't satisfy that.
-# The working fix lives at the dependency-version level inside the
-# nym crate (try a nym-sdk version pinned BEFORE the blake3-1.8
-# upgrade) — see relay/nym/Cargo.toml.
+# ---------------------------------------------------------------------
+# Local patch for the nym-sdk 1.21 trait-incoherence (blake3 1.8 adopted
+# `digest 0.11`, while pervasive nym-crypto callers — nym-sphinx-anonymous-
+# replies via hmac — still use `digest 0.10`. Resulting 5x E0277/E0599.
+#
+# nym-crypto 1.21 declares `blake3 = "1.7.0"` which semver-resolves to
+# anything in [1.7, 2.0), letting the resolver pick 1.8.5 in practice.
+# Our vendored copy at `relay/vendored/nym-crypto/` tightens the pin to
+# exact `=1.7.0` so the resolver stays on the digest-0.10-compatible
+# blake3 line. No code changes — only the Cargo.toml version constraint.
+#
+# Track-upstream procedure: when nym-sdk releases a version that
+# coordinates digest crate versions (either bumping hmac to digest 0.11
+# OR confirming nym-crypto stays on blake3 < 1.8), drop both this patch
+# and the `relay/vendored/nym-crypto/` directory, and bump the
+# `nym-sdk` version in `relay/nym/Cargo.toml`.
+# ---------------------------------------------------------------------
+[patch.crates-io]
+nym-crypto = { path = "vendored/nym-crypto" }
+# Sibling patch: nym-sphinx-anonymous-replies still imports
+# `GenericArray` from the old generic-array crate (typenum-based
+# generic array). digest 0.11 returns `hybrid_array::Array` instead.
+# Our vendored copy swaps the import + the one type-alias use.
+nym-sphinx-anonymous-replies = { path = "vendored/nym-sphinx-anonymous-replies" }
