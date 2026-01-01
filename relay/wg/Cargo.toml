@@ -1,0 +1,23 @@
+[package]
+name = "tetherand-wg"
+version = "0.1.0"
+edition.workspace = true
+license = "Apache-2.0"
+authors.workspace = true
+description = "BoringTun WireGuard wrapper for Tetherand; cdylib targets arm64-android via NDK."
+
+[lib]
+name = "tetherand_wg"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+boringtun = { version = "0.7", default-features = false }
+x25519-dalek = { version = "2.0", features = ["static_secrets"] }
+base64 = "0.22"
+thiserror = { workspace = true }
+log = "0.4"
+rand = "0.8"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+android_logger = "0.14"
