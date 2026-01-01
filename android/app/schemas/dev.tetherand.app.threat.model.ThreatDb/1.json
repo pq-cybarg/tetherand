@@ -1,0 +1,184 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "2f9e38412e960c19fa8a08496fd892e6",
+    "entities": [
+      {
+        "tableName": "alerts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ts_ms` INTEGER NOT NULL, `heuristic` TEXT NOT NULL, `severity` TEXT NOT NULL, `summary` TEXT NOT NULL, `evidence_json` TEXT NOT NULL, `geohash6` TEXT, `dismissed` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tsMs",
+            "columnName": "ts_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "heuristic",
+            "columnName": "heuristic",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "severity",
+            "columnName": "severity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "summary",
+            "columnName": "summary",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceJson",
+            "columnName": "evidence_json",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "geohash6",
+            "columnName": "geohash6",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dismissed",
+            "columnName": "dismissed",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "baseline_cells",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`geohash6` TEXT NOT NULL, `mcc_mnc` TEXT NOT NULL, `lac` INTEGER NOT NULL, `cid` INTEGER NOT NULL, `rat` TEXT NOT NULL, `earfcn` INTEGER, `tac` INTEGER, `pci` INTEGER, `signal_dbm` INTEGER, `first_seen_ms` INTEGER NOT NULL, `last_seen_ms` INTEGER NOT NULL, `sightings` INTEGER NOT NULL, PRIMARY KEY(`geohash6`, `mcc_mnc`, `lac`, `cid`))",
+        "fields": [
+          {
+            "fieldPath": "geohash6",
+            "columnName": "geohash6",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mccMnc",
+            "columnName": "mcc_mnc",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lac",
+            "columnName": "lac",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cid",
+            "columnName": "cid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rat",
+            "columnName": "rat",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "earfcn",
+            "columnName": "earfcn",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "tac",
+            "columnName": "tac",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "pci",
+            "columnName": "pci",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "signalDbm",
+            "columnName": "signal_dbm",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "firstSeenMs",
+            "columnName": "first_seen_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSeenMs",
+            "columnName": "last_seen_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sightings",
+            "columnName": "sightings",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "geohash6",
+            "mcc_mnc",
+            "lac",
+            "cid"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_baseline_cells_geohash6",
+            "unique": false,
+            "columnNames": [
+              "geohash6"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_baseline_cells_geohash6` ON `${TABLE_NAME}` (`geohash6`)"
+          },
+          {
+            "name": "index_baseline_cells_mcc_mnc",
+            "unique": false,
+            "columnNames": [
+              "mcc_mnc"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_baseline_cells_mcc_mnc` ON `${TABLE_NAME}` (`mcc_mnc`)"
+          }
+        ],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2f9e38412e960c19fa8a08496fd892e6')"
+    ]
+  }
+}
