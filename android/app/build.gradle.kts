@@ -71,13 +71,15 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite:2.16.1")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
-    // M10.x ModelUpdater hybrid signature verify. Android stdlib's
-    // java.security.Signature has no ML-DSA family — BouncyCastle
-    // (1.78+) provides it. Combined with the stock SunEC / AndroidEC
-    // providers for ECDSA-P256, the verifier walks both signatures
-    // (classical + post-quantum, NIST level 5) per the strict
-    // hybrid posture documented in ModelUpdater.kt.
-    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    // M10.x ModelUpdater quadruple-signature verify. Android stdlib's
+    // java.security.Signature lacks the PQ families — BouncyCastle 1.80+
+    // provides ML-DSA-87 (FIPS 204 lattice) and SLH-DSA-SHA2-256s
+    // (FIPS 205 hash-based). Combined with stock EC providers for
+    // ECDSA-P521 (NIST L5 classical) and Ed448 (~L4 Edwards classical,
+    // non-NIST origin), the verifier walks all four signatures —
+    // "highest security available across diverse cryptographic
+    // assumptions". See ModelUpdater.kt for the full rationale.
+    implementation("org.bouncycastle:bcprov-jdk18on:1.80")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     debugImplementation("androidx.compose.ui:ui-tooling")

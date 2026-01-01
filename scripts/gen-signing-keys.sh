@@ -1,27 +1,41 @@
 #!/usr/bin/env bash
-# Generate the two AI Guard model-bundle signing keypairs and emit the
+# Generate the FOUR AI Guard model-bundle signing keypairs and emit the
 # pubkey hex constants ready to paste into
 # android/app/src/main/kotlin/dev/tetherand/app/aiguard/runtime/ModelUpdater.kt
 #
-# Keys produced:
-#   keys/aiguard-signer-ecdsa.pem      ECDSA P-256 private key
-#   keys/aiguard-signer-ecdsa.pub.der  ECDSA P-256 X.509/SPKI pubkey
-#   keys/aiguard-signer-mldsa.pem      ML-DSA-87 private key
-#   keys/aiguard-signer-mldsa.pub.der  ML-DSA-87 X.509/SPKI pubkey
+# Keys produced (one keypair per cryptographic family):
+#   keys/aiguard-signer-p521.{pem,pub.der}    ECDSA P-521 / SHA-512
+#                                             (NIST L5 classical, FIPS 186-5)
+#   keys/aiguard-signer-ed448.{pem,pub.der}   Ed448 pure-EdDSA
+#                                             (non-NIST classical, RFC 8032)
+#   keys/aiguard-signer-mldsa.{pem,pub.der}   ML-DSA-87
+#                                             (PQ lattice, FIPS 204, NIST L5)
+#   keys/aiguard-signer-slhdsa.{pem,pub.der}  SLH-DSA-SHA2-256s
+#                                             (PQ hash-based, FIPS 205, NIST L5)
+#
+# Why four? The ModelUpdater is the only path that hot-loads code-equivalent
+# data (LiteRT model files) post-install. A single compromised algorithm
+# would be enough to swap a hostile classifier into the device. By insisting
+# that EVERY one of four signatures over diverse cryptographic assumptions
+# (NIST EC, non-NIST EC, lattice, stateless hash) verifies, no single family
+# break — quantum or otherwise — can unlock the channel. This is the
+# IETF composite-sigs philosophy taken to its logical conclusion.
 #
 # Usage:
 #   bash scripts/gen-signing-keys.sh           # generate, refuse if exists
 #   bash scripts/gen-signing-keys.sh --force   # overwrite existing keys
 #
-# After running, paste the two hex values printed at the end into the
-# `ECDSA_PUBKEY_HEX` and `MLDSA_PUBKEY_HEX` constants in ModelUpdater.kt.
+# After running, paste the FOUR hex values printed at the end into the
+# `P521_PUBKEY_HEX`, `ED448_PUBKEY_HEX`, `MLDSA_PUBKEY_HEX`, and
+# `SLHDSA_PUBKEY_HEX` constants in ModelUpdater.kt.
 #
-# Then keep the .pem files OFFLINE. They sign every manifest. Loss
-# of either file = inability to issue updates (which is fine — the
-# old shipped APK keeps working). Compromise of either file = an
-# attacker can sign one half of the pair, but not both — the hybrid
-# verifier rejects single-sig manifests. Compromise of BOTH files is
-# total release-channel takeover; rotate via re-keygen + APK reship.
+# Then keep the four .pem files OFFLINE. They sign every manifest. Loss
+# of any one of them = inability to issue updates (which is fine — the
+# old shipped APK keeps working). Compromise of three of four files
+# means an attacker can sign three quarters of the wrapper, but not all
+# four — the quadruple verifier rejects any manifest missing even one
+# signature. Compromise of ALL FOUR files is total release-channel
+# takeover; rotate via re-keygen + APK reship.
 
 set -euo pipefail
 
@@ -33,7 +47,7 @@ for arg in "$@"; do
     case "$arg" in
         --force|-f) FORCE=1 ;;
         --help|-h)
-            sed -n '2,32p' "$0"
+            sed -n '2,50p' "$0"
             exit 0 ;;
         *)
             echo "unknown flag: $arg" >&2
@@ -44,33 +58,46 @@ done
 # ---- Preflight: tools + permissions -----------------------------------
 
 command -v openssl >/dev/null || { echo "openssl not on PATH" >&2; exit 1; }
+command -v xxd     >/dev/null || { echo "xxd not on PATH"     >&2; exit 1; }
 
-# Need OpenSSL 3.5+ for native ML-DSA-87. Check the version banner.
+# Need OpenSSL 3.5+ for native ML-DSA + SLH-DSA. OpenSSL 3.6 is the
+# tested floor (ships ML-DSA + SLH-DSA + Ed448 + ECDSA-P521 with no
+# external provider plugin required).
 OSSL_VERSION=$(openssl version | awk '{print $2}')
 OSSL_MAJOR=$(echo "$OSSL_VERSION" | cut -d. -f1)
 OSSL_MINOR=$(echo "$OSSL_VERSION" | cut -d. -f2)
 if [ "$OSSL_MAJOR" -lt 3 ] || { [ "$OSSL_MAJOR" -eq 3 ] && [ "$OSSL_MINOR" -lt 5 ]; }; then
-    echo "OpenSSL $OSSL_VERSION lacks ML-DSA-87 (need 3.5+)." >&2
-    echo "On macOS: 'brew install openssl@3'; on Linux check your distro for openssl-3.5+." >&2
+    echo "OpenSSL $OSSL_VERSION lacks native PQ support (need 3.5+, 3.6+ recommended)." >&2
+    echo "On macOS:  brew install openssl@3" >&2
+    echo "On Linux:  check your distro for openssl-3.5+ packages, or build from source." >&2
+    echo "Alternative: load the liboqs OpenSSL provider for older builds." >&2
     exit 1
 fi
 
-# Confirm ML-DSA-87 actually probes (some OpenSSL 3.5 builds ship
-# without the PQ algorithms unless a separate provider is loaded).
-if ! openssl genpkey -algorithm ML-DSA-87 -out /tmp/.tetherand-keygen-probe 2>/dev/null; then
-    echo "openssl knows the version but cannot generate ML-DSA-87." >&2
-    echo "Your build is missing the PQC algorithms. Reinstall openssl or load a PQC provider." >&2
+# Confirm each algorithm actually probes — some OpenSSL 3.5 builds ship
+# without the PQ algorithms unless a separate provider is loaded.
+probe() {
+    local alg="$1"; local out
+    out=$(openssl genpkey -algorithm "$alg" -out /tmp/.tetherand-keygen-probe 2>&1) || {
+        echo "openssl cannot generate $alg: $out" >&2
+        echo "Your build is missing $alg. Upgrade OpenSSL or load a provider." >&2
+        rm -f /tmp/.tetherand-keygen-probe
+        exit 1
+    }
     rm -f /tmp/.tetherand-keygen-probe
-    exit 1
-fi
-rm -f /tmp/.tetherand-keygen-probe
+}
+probe ED448
+probe ML-DSA-87
+probe SLH-DSA-SHA2-256s
 
 mkdir -p "$KEYS_DIR"
 
 # ---- Refuse to clobber unless --force ----------------------------------
 
-for f in aiguard-signer-ecdsa.pem aiguard-signer-mldsa.pem \
-         aiguard-signer-ecdsa.pub.der aiguard-signer-mldsa.pub.der; do
+for f in aiguard-signer-p521.pem    aiguard-signer-p521.pub.der    \
+         aiguard-signer-ed448.pem   aiguard-signer-ed448.pub.der   \
+         aiguard-signer-mldsa.pem   aiguard-signer-mldsa.pub.der   \
+         aiguard-signer-slhdsa.pem  aiguard-signer-slhdsa.pub.der; do
     if [ -f "$KEYS_DIR/$f" ] && [ "$FORCE" -ne 1 ]; then
         echo "Refusing to overwrite existing $f without --force." >&2
         echo "Rotate intentionally; old in-the-wild APKs trust only the old pubkeys." >&2
@@ -78,17 +105,25 @@ for f in aiguard-signer-ecdsa.pem aiguard-signer-mldsa.pem \
     fi
 done
 
-# ---- Generate the keypairs --------------------------------------------
+# ---- Generate the four keypairs ---------------------------------------
 
-echo "Generating ECDSA P-256 keypair…"
-openssl ecparam -name prime256v1 -genkey -noout \
-    -out "$KEYS_DIR/aiguard-signer-ecdsa.pem"
-openssl ec -in  "$KEYS_DIR/aiguard-signer-ecdsa.pem" -pubout \
-           -outform DER \
-           -out "$KEYS_DIR/aiguard-signer-ecdsa.pub.der" 2>/dev/null
-chmod 600 "$KEYS_DIR/aiguard-signer-ecdsa.pem"
+echo "Generating ECDSA P-521 keypair (NIST L5 classical, FIPS 186-5)…"
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-521 \
+    -out "$KEYS_DIR/aiguard-signer-p521.pem" 2>/dev/null
+openssl pkey -in "$KEYS_DIR/aiguard-signer-p521.pem" -pubout \
+             -outform DER \
+             -out "$KEYS_DIR/aiguard-signer-p521.pub.der" 2>/dev/null
+chmod 600 "$KEYS_DIR/aiguard-signer-p521.pem"
 
-echo "Generating ML-DSA-87 keypair (FIPS-204, NIST PQC Level 5)…"
+echo "Generating Ed448 keypair (non-NIST classical, RFC 8032 ~L4)…"
+openssl genpkey -algorithm ED448 \
+    -out "$KEYS_DIR/aiguard-signer-ed448.pem" 2>/dev/null
+openssl pkey -in "$KEYS_DIR/aiguard-signer-ed448.pem" -pubout \
+             -outform DER \
+             -out "$KEYS_DIR/aiguard-signer-ed448.pub.der" 2>/dev/null
+chmod 600 "$KEYS_DIR/aiguard-signer-ed448.pem"
+
+echo "Generating ML-DSA-87 keypair (FIPS 204 lattice, NIST L5)…"
 openssl genpkey -algorithm ML-DSA-87 \
     -out "$KEYS_DIR/aiguard-signer-mldsa.pem" 2>/dev/null
 openssl pkey -in "$KEYS_DIR/aiguard-signer-mldsa.pem" -pubout \
@@ -96,30 +131,59 @@ openssl pkey -in "$KEYS_DIR/aiguard-signer-mldsa.pem" -pubout \
              -out "$KEYS_DIR/aiguard-signer-mldsa.pub.der" 2>/dev/null
 chmod 600 "$KEYS_DIR/aiguard-signer-mldsa.pem"
 
-ECDSA_HEX="$(xxd -p -c 99999 "$KEYS_DIR/aiguard-signer-ecdsa.pub.der" | tr -d '\n')"
-MLDSA_HEX="$(xxd -p -c 99999 "$KEYS_DIR/aiguard-signer-mldsa.pub.der" | tr -d '\n')"
+echo "Generating SLH-DSA-SHA2-256s keypair (FIPS 205 hash-based, NIST L5)…"
+openssl genpkey -algorithm SLH-DSA-SHA2-256s \
+    -out "$KEYS_DIR/aiguard-signer-slhdsa.pem" 2>/dev/null
+openssl pkey -in "$KEYS_DIR/aiguard-signer-slhdsa.pem" -pubout \
+             -outform DER \
+             -out "$KEYS_DIR/aiguard-signer-slhdsa.pub.der" 2>/dev/null
+chmod 600 "$KEYS_DIR/aiguard-signer-slhdsa.pem"
+
+P521_HEX="$(xxd -p -c 99999 "$KEYS_DIR/aiguard-signer-p521.pub.der"   | tr -d '\n')"
+ED448_HEX="$(xxd -p -c 99999 "$KEYS_DIR/aiguard-signer-ed448.pub.der"  | tr -d '\n')"
+MLDSA_HEX="$(xxd -p -c 99999 "$KEYS_DIR/aiguard-signer-mldsa.pub.der"  | tr -d '\n')"
+SLHDSA_HEX="$(xxd -p -c 99999 "$KEYS_DIR/aiguard-signer-slhdsa.pub.der" | tr -d '\n')"
 
 # ---- Sanity-check key shapes ------------------------------------------
 
-# P-256 SPKI is 91 bytes (182 hex chars). ML-DSA-87 SPKI is 2614
-# bytes (5228 hex chars). Tolerate ±4 hex chars for header variants.
-[ ${#ECDSA_HEX} -ge 178  ] && [ ${#ECDSA_HEX} -le 186 ]  || { echo "ECDSA pubkey unexpected length: ${#ECDSA_HEX}" >&2; exit 1; }
-[ ${#MLDSA_HEX} -ge 5224 ] && [ ${#MLDSA_HEX} -le 5232 ] || { echo "ML-DSA pubkey unexpected length: ${#MLDSA_HEX}" >&2; exit 1; }
+# P-521 SPKI is 158 bytes (316 hex chars).
+# Ed448 SPKI is 69 bytes (138 hex chars).
+# ML-DSA-87 SPKI is 2614 bytes (5228 hex chars).
+# SLH-DSA-SHA2-256s SPKI is 82 bytes (164 hex chars).
+# Tolerate ±4 hex chars for header variants across OpenSSL minor versions.
+check_len() {
+    local label="$1" hex="$2" lo="$3" hi="$4"
+    [ ${#hex} -ge "$lo" ] && [ ${#hex} -le "$hi" ] || {
+        echo "$label pubkey unexpected length: ${#hex} (want $lo–$hi)" >&2
+        exit 1
+    }
+}
+check_len "P-521"   "$P521_HEX"    312  320
+check_len "Ed448"   "$ED448_HEX"   134  142
+check_len "ML-DSA"  "$MLDSA_HEX"   5224 5232
+check_len "SLH-DSA" "$SLHDSA_HEX"  160  168
 
 # ---- Report ------------------------------------------------------------
 
 cat <<EOF
 
-  ✓ ECDSA-P256 keypair  → keys/aiguard-signer-ecdsa.{pem,pub.der}
-  ✓ ML-DSA-87  keypair  → keys/aiguard-signer-mldsa.{pem,pub.der}
+  ✓ ECDSA P-521         → keys/aiguard-signer-p521.{pem,pub.der}
+  ✓ Ed448               → keys/aiguard-signer-ed448.{pem,pub.der}
+  ✓ ML-DSA-87           → keys/aiguard-signer-mldsa.{pem,pub.der}
+  ✓ SLH-DSA-SHA2-256s   → keys/aiguard-signer-slhdsa.{pem,pub.der}
 
-Next: paste the two values below into
+Next: paste the FOUR values below into
   android/app/src/main/kotlin/dev/tetherand/app/aiguard/runtime/ModelUpdater.kt
 
 ────────────────────────────────────────────────────────────────────────
-ECDSA_PUBKEY_HEX (${#ECDSA_HEX} hex chars):
+P521_PUBKEY_HEX (${#P521_HEX} hex chars):
 
-$ECDSA_HEX
+$P521_HEX
+
+────────────────────────────────────────────────────────────────────────
+ED448_PUBKEY_HEX (${#ED448_HEX} hex chars):
+
+$ED448_HEX
 
 ────────────────────────────────────────────────────────────────────────
 MLDSA_PUBKEY_HEX (${#MLDSA_HEX} hex chars):
@@ -127,16 +191,25 @@ MLDSA_PUBKEY_HEX (${#MLDSA_HEX} hex chars):
 $MLDSA_HEX
 
 ────────────────────────────────────────────────────────────────────────
+SLHDSA_PUBKEY_HEX (${#SLHDSA_HEX} hex chars):
+
+$SLHDSA_HEX
+
+────────────────────────────────────────────────────────────────────────
 
 After pasting and re-building the APK, sign manifests with:
 
   bash scripts/sign-manifest.sh \\
-       keys/aiguard-signer-ecdsa.pem \\
-       keys/aiguard-signer-mldsa.pem \\
+       keys/aiguard-signer-p521.pem   \\
+       keys/aiguard-signer-ed448.pem  \\
+       keys/aiguard-signer-mldsa.pem  \\
+       keys/aiguard-signer-slhdsa.pem \\
        <your-manifest-body.json> > <output.json>
 
-Keep the two .pem files OFFLINE. Anyone with both can sign your
-release-channel — they ARE the release-channel identity. The hybrid
-verifier defends against compromise of either ONE key alone.
+Keep the four .pem files OFFLINE — air-gapped, ideally split across
+custodians. Anyone with all four can sign your release-channel; they
+ARE the release-channel identity. The quadruple verifier defends
+against compromise of any THREE keys (or any one family-wide
+cryptographic break — classical, lattice, or hash-based).
 
 EOF
