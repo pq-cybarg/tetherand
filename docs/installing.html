@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Installing · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Step-by-step installation walkthrough for Tetherand on the Solana Seeker.">
+<meta property="og:title" content="Installing · Tetherand">
+<meta property="og:description" content="Step-by-step installation walkthrough for Tetherand on the Solana Seeker.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/installing.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html" class="current">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>Installing Tetherand</h1>
+<p>This page walks through installing Tetherand on a Solana Seeker for the first time. It assumes you have the device factory-reset and signed in.</p>
+
+<h2 id="prereqs">What you'll need</h2>
+<ul>
+  <li>A <strong>Solana Seeker</strong> on Android 16 (SDK 36). The app technically runs on any Android 14+ device but the cellular threat heuristics are tuned for the Seeker's MediaTek MT6878 modem.</li>
+  <li>A laptop (macOS or Linux) with <code>adb</code> on your <code>$PATH</code>. Install via <a href="https://developer.android.com/studio/releases/platform-tools">Android Platform Tools</a>.</li>
+  <li>A USB-C cable.</li>
+  <li>Optional: an RTL-SDR dongle (~$30) and a USB-C OTG cable if you want the SDR detection path. Tetherand works without these.</li>
+</ul>
+
+<h2 id="step1">Step 1 &mdash; Enable Developer Options on the Seeker</h2>
+<ol>
+  <li>Open <strong>Settings &rarr; About phone</strong>.</li>
+  <li>Tap <strong>Build number</strong> seven times. You'll see a "you are now a developer" toast.</li>
+  <li>Go back, open <strong>System &rarr; Developer options</strong>.</li>
+  <li>Turn on <strong>USB debugging</strong>.</li>
+</ol>
+
+<h2 id="step2">Step 2 &mdash; Plug into the laptop</h2>
+<p>Connect the Seeker to the laptop via USB-C. On the phone, accept the "Allow USB debugging?" prompt and tick <strong>Always allow from this computer</strong>.</p>
+<p>Verify the device is visible:</p>
+<pre><code>adb devices</code></pre>
+<p>You should see one line with <code>device</code> after the serial number. If you see <code>unauthorized</code>, re-check the prompt on the phone.</p>
+
+<h2 id="step3">Step 3 &mdash; Download the APK</h2>
+<p>Grab the latest signed release from the <a href="https://github.com/pq-cybarg/tetherand/releases">releases page</a>. Two convenient choices:</p>
+<ul>
+  <li><code>tetherand.apk</code> &mdash; the full bundle, every native library included. Best if you want every privacy hop without rebuilding.</li>
+  <li>A specific subset zip from <code>dist/bundles/</code> &mdash; useful if you want to keep the APK small and only ship the hops you'll actually use. See <a href="bundles.html">Bundle Combinations</a> for the menu.</li>
+</ul>
+
+<h2 id="step4">Step 4 &mdash; Verify the download</h2>
+<div class="callout warn">
+  <strong>Don't skip this.</strong> A network-level attacker can substitute downloads. Verifying both hashes against the release page sidecars is the cheapest defense and it takes 10 seconds.
+</div>
+<pre><code>shasum -a 256 tetherand.apk
+openssl dgst -sha3-256 tetherand.apk</code></pre>
+<p>Both should match the <code>tetherand.apk.sha256</code> and <code>tetherand.apk.sha3-256</code> sidecar files from the same release page. Full details and worked examples at <a href="verifying.html">Verifying downloads</a>.</p>
+
+<h2 id="step5">Step 5 &mdash; Install</h2>
+<pre><code>adb install -r tetherand.apk</code></pre>
+<p>You should see <code>Success</code>. If you see <code>INSTALL_FAILED_INSUFFICIENT_STORAGE</code>, free at least 100 MB on the device.</p>
+
+<h2 id="step6">Step 6 &mdash; Pre-grant VPN consent</h2>
+<p>Tetherand uses Android's VpnService API for the privacy chain. By default each VpnService launch shows a confirmation dialog the first time. To skip that dialog (handy during smoke testing, but optional):</p>
+<pre><code>adb shell cmd appops set dev.tetherand.app ACTIVATE_VPN allow</code></pre>
+
+<h2 id="step7">Step 7 &mdash; Launch the app</h2>
+<p>Tap the <strong>&amp;</strong> icon on the Seeker. You should land on the <strong>Tether</strong> tab.</p>
+<p>The bottom navigation has four tabs:</p>
+<ul class="checklist">
+  <li><strong>Tether</strong> &mdash; start and stop the laptop-tether.</li>
+  <li><strong>Privacy</strong> &mdash; compose the privacy chain.</li>
+  <li><strong>Threat</strong> &mdash; cellular and Wi-Fi alerts, hardened-mode controls, incident response.</li>
+  <li><strong>AI</strong> &mdash; AI Guard defenses and field guide.</li>
+</ul>
+
+<h2 id="step8">Step 8 &mdash; First tether</h2>
+<p>Back on the laptop, with <code>tetherand</code> on your <code>$PATH</code>:</p>
+<pre><code>tetherand run</code></pre>
+<p>This sets up <code>adb reverse</code> and starts the relay. On the phone, the Tether tab now shows the VPN service running. The laptop will block on <kbd>Ctrl-C</kbd>; press it to tear down.</p>
+
+<h2 id="next">From here</h2>
+<ul>
+  <li><a href="privacy-chain.html">Privacy chain</a> &mdash; add WireGuard, Tor, Nym, Mullvad.</li>
+  <li><a href="threat-detection.html">Threat detection</a> &mdash; what the alerts mean.</li>
+  <li><a href="hardened-mode.html">Hardened Mode</a> &mdash; one-tap DEFCON lockdown.</li>
+  <li><a href="cli.html">CLI reference</a> &mdash; every <code>tetherand</code> subcommand.</li>
+</ul>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

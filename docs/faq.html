@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FAQ · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Common questions about device support, root, AI privacy, reproducibility, contributing, and security reporting.">
+<meta property="og:title" content="FAQ · Tetherand">
+<meta property="og:description" content="Common questions about device support, root, AI privacy, reproducibility, contributing, and security reporting.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/faq.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html" class="current">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>FAQ</h1>
+
+<h2 id="seeker">Is Tetherand specific to the Solana Seeker?</h2>
+<p>The threat-detection cellular heuristics are tuned for the Seeker's MediaTek MT6878 modem and Android 16 (SDK 36) APIs. The tether, privacy chain, hardened mode, and AI Guard subsystems work on any Android 14+ device with similar hardware. The MediaTek-specific paths (<code>/proc/ccci_md1_*</code>, <code>/dev/ttyMT0</code>) cleanly degrade to a Dormant state on other chipsets.</p>
+
+<h2 id="without-laptop">Does Tetherand work on Wi-Fi only, without a laptop?</h2>
+<p>Yes. The reverse-tether to a laptop is one of four optional features. The privacy chain, threat detection, and hardened mode all run standalone with the phone's normal cellular or Wi-Fi connectivity.</p>
+
+<h2 id="root">Does it need root?</h2>
+<p>No. The base app runs on stock, un-rooted Android. There is an <strong>optional</strong> root-tier path (M7c) that reads MediaTek's modem diagnostic interface for higher-fidelity cellular threat detection &mdash; it cleanly turns off when not rooted.</p>
+
+<h2 id="cloud">Does the AI Guard ever send data to a cloud API?</h2>
+<p>No. This is a load-bearing hard constraint. Every model runs on the phone's NPU via LiteRT + NNAPI. The egress-LLM-API watch defense exists specifically to catch any <em>other</em> app on the device that violates this same principle.</p>
+
+<h2 id="reproducible">How is the build reproducible?</h2>
+<p>The cross-compile scripts apply <code>--remap-path-prefix</code> so workstation-specific paths don't end up in <code>.rodata</code> panic strings. Combined with deterministic timestamps (Gradle clamps file mtimes to 1981-01-01) and the workspace's <code>profile.release</code> configured for <code>strip = true, debug = false</code>, the same source on the same toolchain produces byte-identical output.</p>
+<p>That output is then hashed with two unrelated families (SHA-256 + SHA3-256). See <a href="verifying.html">Verifying downloads</a>.</p>
+
+<h2 id="snowflake">What about Snowflake?</h2>
+<p>The Snowflake pluggable transport is the one v0.1 deferral. Its upstream dependency <code>github.com/wlynxg/anet</code> uses a <code>net.zoneCache</code> internal symbol that was removed in Go 1.26. Until the upstream is patched, Snowflake builds need Go 1.22 or 1.23. The release ships without it; build it locally if you need it and have an older Go.</p>
+
+<h2 id="icon">Why does the app icon look like a green ampersand?</h2>
+<p>The ampersand is the Tetherand wordmark &mdash; <em>Tether</em> joined to <em>and</em> by <em>&amp;</em>. The dark slate background pairs with the in-app palette where the success-state colour is the same green (<code>#00d68f</code>).</p>
+
+<h2 id="uninstall">How do I uninstall cleanly?</h2>
+<pre><code>adb uninstall dev.tetherand.app</code></pre>
+<p>This removes the APK and every shared-preferences file. The encrypted data was never written outside the app's sandbox, so no cleanup outside of the package is needed.</p>
+<p>If you used the macOS LaunchAgent:</p>
+<pre><code>launchctl unload ~/Library/LaunchAgents/com.tetherand.launcher.plist
+rm ~/Library/LaunchAgents/com.tetherand.launcher.plist</code></pre>
+
+<h2 id="contribute">How do I contribute?</h2>
+<p>This is currently a single-developer project. Read the design at <a href="https://github.com/pq-cybarg/tetherand/tree/main/docs/superpowers/specs"><code>docs/superpowers/specs/</code></a> and the per-milestone plans at <a href="https://github.com/pq-cybarg/tetherand/tree/main/docs/superpowers/plans"><code>docs/superpowers/plans/</code></a>. Pull requests are welcome &mdash; please open an issue first to discuss scope, especially for anything that touches the deterministic-primary / contributory-AI boundary or the privacy posture.</p>
+
+<h2 id="security">Where do I report a security issue?</h2>
+<p>Security issues go to the same address that authors every commit on <code>main</code>. Please use PGP if at all possible. For sensitive issues, do <strong>not</strong> open a public GitHub issue.</p>
+
+<h2 id="help">Where do I get help?</h2>
+<p>Read the <a href="index.html">Home</a> page first. After that:</p>
+<ul>
+  <li><a href="installing.html">Installing</a> for installation walkthroughs.</li>
+  <li><a href="cli.html">CLI reference</a> for the host-side binary.</li>
+  <li><a href="privacy-chain.html">Privacy chain</a>, <a href="threat-detection.html">Threat detection</a>, <a href="hardened-mode.html">Hardened Mode</a>, <a href="ai-guard.html">AI Guard</a> for feature details.</li>
+  <li><a href="building.html">Building from source</a> for the build pipeline.</li>
+  <li><a href="architecture.html">Architecture</a> for the design.</li>
+</ul>
+<p>If none of those answer your question, GitHub Discussions on the main repo is the right place.</p>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

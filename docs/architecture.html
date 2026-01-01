@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Architecture · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Process layout, data-flow diagrams, on-device file paths, and subsystem boundaries.">
+<meta property="og:title" content="Architecture · Tetherand">
+<meta property="og:description" content="Process layout, data-flow diagrams, on-device file paths, and subsystem boundaries.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/architecture.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html" class="current">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>Architecture</h1>
+
+<p>Tetherand splits into three independently shippable subsystems:</p>
+<ul>
+  <li><strong>Tether</strong> (milestones M1&ndash;M2) &mdash; the reverse-tether to a laptop.</li>
+  <li><strong>Privacy chain</strong> (M3&ndash;M6) &mdash; composable VPN hops.</li>
+  <li><strong>Threat detection</strong> (M7, M9, M10) &mdash; on-device monitors and hardened-mode lockdown.</li>
+</ul>
+
+<p>Each subsystem works on its own. You can use the Threat tab without ever enabling the privacy chain; you can use the privacy chain without tethering to a laptop; you can use the tether with no chain and no monitoring.</p>
+
+<h2 id="processes">Process layout</h2>
+
+<p>The Android side runs a single process with several foreground services:</p>
+
+<pre><code>dev.tetherand.app (single process)
+&#9500;&#9472; MainActivity            (Compose UI, 4 tabs)
+&#9500;&#9472; TetherandService        (VpnService &mdash; reverse tether)
+&#9500;&#9472; TetherandChainService   (VpnService &mdash; privacy chain)
+&#9500;&#9472; ThreatDetectionService  (specialUse FGS &mdash; monitors)
+&#9500;&#9472; ClipboardScrubberService (specialUse FGS &mdash; prompt-injection)
+&#9500;&#9472; DecoyListenerService    (specialUse FGS &mdash; Hardened Mode honeypot)
+&#9500;&#9472; HardenedTileService     (QuickSettings tile)
+&#9492;&#9472; AoaAccessoryService     (USB-accessory receiver)</code></pre>
+
+<p>Only one VpnService can be active at a time &mdash; Android enforces this. The user picks which via the bottom-nav tabs.</p>
+
+<p>The host (Mac/Linux) side runs <code>tetherand</code> as a CLI:</p>
+
+<pre><code>tetherand-cli
+&#9500;&#9472; adb reverse                      (USB-ADB transport)
+&#9500;&#9472; tetherand-relay-core             (userspace TCP/UDP/ICMP stack,
+&#9474;                                       forked from Genymobile/gnirehtet)
+&#9500;&#9472; tetherand-transport-{bt,aoa,tcp} (other transports)
+&#9492;&#9472; ratatui dashboard                (`tetherand tui`)</code></pre>
+
+<h2 id="tether-flow">Tether data flow</h2>
+
+<pre><code>&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472; Seeker (dev.tetherand.app APK) &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;  TetherandService (VpnService)                  &#9474;
+&#9474;       &#9474; TUN (10.0.0.2)                          &#9474;
+&#9474;       &#9660;                                          &#9474;
+&#9474;  PersistentRelayTunnel &#9472;&#9472;&#9472;&#9658;  LocalSocket        &#9474;
+&#9474;                              "tetherand"        &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9532;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+                                  &#9474; adb reverse
+                                  &#9660;
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472; Mac (bin/tetherand) &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;  tetherand-relay-core                          &#9474;
+&#9474;       &#9474;  userspace TCP/UDP/ICMP                &#9474;
+&#9474;       &#9660;                                          &#9474;
+&#9474;  Real internet (host Wi-Fi/Ethernet)            &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</code></pre>
+
+<p>The Seeker's VPN TUN receives every packet the device wants to send. The persistent relay tunnel hands it over <code>adb reverse</code> to a TCP socket on the laptop, where the relay-core (forked from Gnirehtet, Apache-2.0) maintains a userspace TCP/UDP/ICMP stack and forwards through the host's normal network egress.</p>
+
+<p>Bluetooth-RFCOMM, USB-AOA, and LAN-TCP transports plug in at the LocalSocket boundary instead of <code>adb reverse</code>. The data shape is the same &mdash; raw IP packets delimited by the IPv4 header length field &mdash; so the relay-core doesn't change.</p>
+
+<h2 id="chain-flow">Privacy chain data flow</h2>
+
+<p>The chain orchestrator (<code>dev.tetherand.app.chain.ChainOrchestrator</code>) defines a generic <code>Hop</code> interface:</p>
+
+<pre><code>interface Hop {
+    val id: String
+    val displayName: String
+    val caps: HopCaps
+    suspend fun start(input: Channel&lt;ByteArray&gt;): Channel&lt;ByteArray&gt;
+    suspend fun stop()
+}</code></pre>
+
+<p>Each hop consumes IP packets from its input channel and emits processed IP packets on its output channel. The orchestrator wires them in sequence, so the user-visible chain is just a list of hops:</p>
+
+<pre><code>TUN &rarr; WireGuardHop &rarr; MullvadHop &rarr; NymHop &rarr; TorHop &rarr; Internet</code></pre>
+
+<p>Each hop also exposes its own capability flags (<code>supportsPQ</code>, <code>supportsMultihop</code>, <code>supportsAntiCensorship</code>), which the UI uses to build the chain-status badge.</p>
+
+<p>The native crypto and protocol logic for each hop lives in a Rust crate at <code>relay/</code>:</p>
+
+<table>
+  <tr><th>Crate</th><th>Hop</th><th>What it does</th></tr>
+  <tr><td><code>relay/wg</code></td><td>WireGuardHop</td><td>BoringTun WireGuard userspace, JNI'd</td></tr>
+  <tr><td><code>relay/tor</code></td><td>TorHop</td><td>arti-client 0.27, JNI'd</td></tr>
+  <tr><td><code>relay/nym</code></td><td>NymHop</td><td>nym-sdk gated by <code>with-sdk</code> feature, JNI'd</td></tr>
+  <tr><td><code>relay/pt-bridge</code></td><td>(auxiliary)</td><td>obfs4 / meek / webtunnel binary, spawned by Arti's PT manager</td></tr>
+</table>
+
+<p>The chain orchestrator never sees the underlying crypto; it only sees IP packets in and IP packets out.</p>
+
+<h2 id="threat-flow">Threat detection data flow</h2>
+
+<p>The threat-detection foreground service runs five collectors concurrently:</p>
+
+<pre><code>CellInfoSource &#9472;&#9472;&#9472;&#9488;
+LocationSource &#9472;&#9472;&#9472;&#9508;
+WifiScanner   &#9472;&#9472;&#9472;&#9532;&#9472;&#9472;&#9472;&#9658; Heuristic orchestrator &#9472;&#9472;&#9472;&#9658; ThreatDb (Room)
+BluetoothScan &#9472;&#9472;&#9472;&#9508;                                       &#9474;
+AppAudit      &#9472;&#9472;&#9472;&#9496;                                       &#9660;
+                                                  ThreatScreen</code></pre>
+
+<p>Each collector emits observations into a coroutine flow. The heuristic orchestrator zips observations across collectors when a heuristic needs cross-source data (for example, "TAC change without motion" needs cell observations and accelerometer observations on the same timeline). Verdicts get written to a Room-backed <code>ThreatDb</code> which the Threat tab observes via Compose <code>collectAsState</code>.</p>
+
+<p>The per-location baseline lives in the same database, keyed by a six-character geohash. Baseline writes happen automatically as observations arrive; baseline reads happen when a heuristic needs to know "what's normal for this geohash". No network calls.</p>
+
+<h2 id="storage">On-device file layout</h2>
+
+<pre><code>/data/data/dev.tetherand.app/
+&#9500;&#9472; files/
+&#9474;  &#9500;&#9472; arti/                        # Arti's cache + state directory
+&#9474;  &#9500;&#9472; nym/                         # Nym SDK state
+&#9474;  &#9492;&#9472; databases/
+&#9474;     &#9500;&#9472; threats.db                # Room-backed alert feed + baseline
+&#9474;     &#9492;&#9472; &hellip;
+&#9500;&#9472; cache/
+&#9474;  &#9500;&#9472; arti/                        # arti cache subdir
+&#9474;  &#9492;&#9472; pts/                         # extracted PT binaries (chmod +x)
+&#9492;&#9472; shared_prefs/
+   &#9500;&#9472; tetherand-hardened.xml       # EncryptedSharedPreferences
+   &#9500;&#9472; tetherand-nym.xml
+   &#9500;&#9472; tetherand-tor-bridges.xml
+   &#9500;&#9472; tetherand-voiceprint.xml
+   &#9492;&#9472; &hellip;</code></pre>
+
+<p>The encrypted SharedPreferences files use the AndroidX security library: AES256-SIV for key encryption, AES256-GCM for value encryption, keys held in the AndroidKeyStore (hardware-backed where available).</p>
+
+<h2 id="licensing-arch">Subsystem boundaries</h2>
+
+<p>The licensing converges towards GPL-3.0-or-later from the moment M7a links in (NetMonster reflection and the AIMSICD port). M1 and M2's tether code is Apache-2.0 in isolation, but the shipped APK ends up GPL-3.0-or-later once the threat module is included. See <a href="licensing.html">Licensing</a> for the full per-milestone map.</p>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

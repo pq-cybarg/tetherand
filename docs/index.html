@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Reverse-tether, privacy chain, threat detection, and Hardened Mode for the Solana Seeker at security conferences.">
+<meta property="og:title" content="Home · Tetherand">
+<meta property="og:description" content="Reverse-tether, privacy chain, threat detection, and Hardened Mode for the Solana Seeker at security conferences.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/index.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html" class="current">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<div class="hero">
+  <img src="img/logo.png" alt="Tetherand &amp; ampersand logo">
+  <div>
+    <h1>Tetherand</h1>
+    <p class="tagline">Reverse-tether, compose a privacy chain, detect cellular and Wi-Fi threats, and lock the device down for a security conference &mdash; on a Solana Seeker.</p>
+    <div class="cta">
+      <a class="primary" href="installing.html">Get started &rarr;</a>
+      <a class="secondary" href="https://github.com/pq-cybarg/tetherand/releases">Download v0.1</a>
+      <a class="secondary" href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+    </div>
+  </div>
+</div>
+
+<h2 id="overview">Four things, one app</h2>
+
+<div class="cards">
+  <div class="card">
+    <h3>1. Reverse-tether</h3>
+    <p>Use the laptop's internet on the phone instead of the cellular modem. USB-ADB, USB-AOA, Bluetooth-RFCOMM, or LAN-TCP &mdash; pick whichever the venue allows.</p>
+  </div>
+  <div class="card">
+    <h3>2. Privacy chain</h3>
+    <p>Compose WireGuard, Mullvad (with post-quantum tunnels + DAITA traffic shaping), Nym's Sphinx mixnet, and Tor with its full bridge stack including the post-quantum NTor handshake preference.</p>
+  </div>
+  <div class="card">
+    <h3>3. On-device threat detection</h3>
+    <p>Watch the cellular environment for IMSI catchers, Wi-Fi for evil-twin access points, Bluetooth for trackers, and the app sandbox for permission drift. One-tap panic button.</p>
+  </div>
+  <div class="card">
+    <h3>4. Hardened Mode</h3>
+    <p>A single toggle captures an attestation snapshot, freezes the trusted-app baseline, runs a honeypot, arms an accelerometer tamper-watcher, and exposes a four-button incident-response runbook.</p>
+  </div>
+</div>
+
+<h2 id="ai-guard">Plus AI Guard</h2>
+<p>A contributory layer for AI-era threats &mdash; deepfake calls, prompt-injection text, synthetic-media provenance, OSINT exposure. Every model runs on the Seeker's NPU. <strong>No prompt, classification, or telemetry ever reaches a cloud LLM API under any circumstances.</strong> The egress-LLM-API watch defense enforces this for other apps on the device too.</p>
+
+<h2 id="why">Why this exists</h2>
+<p>DEFCON's network environment is, by tradition and by sport, the most adversarial network on the planet for the duration of the conference. The 2026 edition is also the first DEFCON since the AI capability boom went mass-market &mdash; the attacker side has scaled, automated, and personalised in ways previous years didn't see.</p>
+<p>Tetherand is what a single phone needs to operate safely in that environment: tether through a known-good laptop, route through a chain of mutually-unaware hops, watch the cellular and Wi-Fi spectra for known attack signatures, and lock down hard.</p>
+
+<h2 id="philosophy">How decisions get made</h2>
+
+<p>Three rules govern every defense in the app. They are not configurable through the UI.</p>
+
+<ol>
+  <li><strong>Deterministic core, contributory AI.</strong> Every defense has a deterministic primary mechanism &mdash; a clear rule, threshold, or heuristic &mdash; that drives any consequential action. Local AI classifiers are advisory only. They can raise risk scores and surface warning banners, but they cannot be the sole trigger for anything destructive.</li>
+  <li><strong>Local-only AI.</strong> Every model runs on the Seeker's NPU. No prompt, classification, or telemetry ever reaches a cloud LLM API under any circumstances.</li>
+  <li><strong>No telemetry.</strong> Tetherand never phones home. Models update only through whatever privacy chain the user has active.</li>
+</ol>
+
+<h2 id="next">Next steps</h2>
+<div class="cards">
+  <div class="card"><h3><a href="installing.html">Install</a></h3><p>An eight-step walkthrough from a factory-reset Seeker to a working tether.</p></div>
+  <div class="card"><h3><a href="verifying.html">Verify a download</a></h3><p>Tetherand ships paired SHA-256 + SHA3-256 sidecars for every artefact.</p></div>
+  <div class="card"><h3><a href="privacy-chain.html">Compose a privacy chain</a></h3><p>Per-hop walkthroughs for WireGuard, Mullvad, Nym, and Tor.</p></div>
+  <div class="card"><h3><a href="hardened-mode.html">Hardened Mode</a></h3><p>The DEFCON one-tap profile, what it does, and what trade-offs come with it.</p></div>
+</div>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Building from source · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Full toolchain prereqs, native-lib cross-compile, signed-release pipeline, test suite, known snags.">
+<meta property="og:title" content="Building from source · Tetherand">
+<meta property="og:description" content="Full toolchain prereqs, native-lib cross-compile, signed-release pipeline, test suite, known snags.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/building.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html" class="current">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>Building from source</h1>
+
+<p>This page walks through a full rebuild of Tetherand from a fresh clone, including every native library.</p>
+
+<h2 id="toolchain">Toolchain prerequisites</h2>
+
+<table>
+  <tr><th>Tool</th><th>Version</th><th>Used for</th></tr>
+  <tr><td>Android NDK</td><td>r26 or newer</td><td>Cross-compiling Rust + C libs to arm64-android</td></tr>
+  <tr><td>Android SDK</td><td>API 36 platform</td><td><code>apksigner</code>, <code>zipalign</code>, <code>adb</code></td></tr>
+  <tr><td>Rust</td><td>1.85+</td><td>The workspace at <code>relay/</code></td></tr>
+  <tr><td><code>aarch64-linux-android</code> target</td><td><code>rustup target add aarch64-linux-android</code></td><td>Cross-compile output</td></tr>
+  <tr><td>Go</td><td>1.22 or 1.23 (not 1.26 yet)</td><td>Conjure / Snowflake upstream binaries</td></tr>
+  <tr><td>cmake</td><td>3.20+</td><td>librtlsdr / libhackrf / libusb</td></tr>
+  <tr><td>Java</td><td>OpenJDK 21</td><td>Gradle wrapper expects 21+</td></tr>
+</table>
+
+<p>Set <code>NDK_HOME</code> (or <code>ANDROID_NDK_HOME</code>) to the NDK root before any native build:</p>
+
+<pre><code>export NDK_HOME=$HOME/Library/Android/sdk/ndk/26.3.11579264</code></pre>
+
+<p>(macOS path shown; Linux path is similar under <code>~/Android/Sdk/ndk</code>.)</p>
+
+<h2 id="quick">Quick path &mdash; debug APK with all native libs</h2>
+
+<pre><code>make native-all   # cross-compiles wg, tor, nym, pt-bridge, librtlsdr stack
+make apk          # repackages the APK + emits hash sidecars
+make install      # adb install + pre-grants VPN consent
+make smoke-device # UiAutomator walk</code></pre>
+
+<p>The full bundle APK lands in <code>bin/tetherand.apk</code> at around 59 MB. Hash sidecars (<code>tetherand.apk.sha256</code> and <code>tetherand.apk.sha3-256</code>) and a master <code>bin/SHASUMS.txt</code> are emitted by <code>make hashes</code>, which <code>make apk</code> runs automatically.</p>
+
+<h2 id="individual">Individual native libraries</h2>
+
+<pre><code>make native-wg       # libtetherand_wg.so (WireGuard via BoringTun)
+make native-tor      # libtetherand_tor.so (Arti)
+make native-nym      # libtetherand_nym.so (NymVPN JNI surface)
+make native-pt       # libtetherand_pt.so (obfs4/meek/webtunnel) + libconjure_client.so
+make native-rtlsdr   # librtlsdr.so + libhackrf.so + libusb1.0.so</code></pre>
+
+<p>Each script lives under <code>scripts/build-*-android.sh</code>. They all apply <code>--remap-path-prefix</code> so that build-time absolute paths from your workstation don't end up in the shipped <code>.rodata</code> panic strings.</p>
+
+<h2 id="signed">Signed release APK</h2>
+
+<pre><code>make release-signed</code></pre>
+
+<p>This runs:</p>
+<ol>
+  <li><code>gradle assembleRelease</code> to produce the unsigned APK.</li>
+  <li><code>zipalign -p 4</code> for page-aligned native libraries.</li>
+  <li><code>apksigner sign</code> with SHA256-RSA2048 against the Android v2 signing scheme.</li>
+</ol>
+
+<p>The script gates the signing step against an out-of-repo allow-list of approved certificate DNs (<code>~/.tetherand-signing-allow</code>). The stock <code>CN=Android Debug, O=Android, C=US</code> debug subject is always allowed without an entry. To use a production keystore:</p>
+
+<pre><code>keytool -genkeypair -alias tetherand-prod -keystore tetherand-prod.jks \
+  -keyalg RSA -keysize 4096 -validity 36500 \
+  -dname "CN=Tetherand, O=pq-cybarg, C=US"
+
+echo "CN=Tetherand, O=pq-cybarg, C=US" &gt;&gt; ~/.tetherand-signing-allow</code></pre>
+
+<h2 id="bundles-link">Bundle combinations</h2>
+
+<p><code>scripts/bundle-combinations.sh</code> generates every subset of the six native-library groups (<code>wg</code>, <code>tor</code>, <code>nym</code>, <code>pt</code>, <code>pts</code>, <code>sdr</code>) as its own zip with paired SHA-256 + SHA3-256 sidecars under <code>dist/bundles/</code>. Details at <a href="bundles.html">Bundle combinations</a>.</p>
+
+<h2 id="snags">Known build snags</h2>
+
+<table>
+  <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+  <tr><td><code>ld.lld: error: unable to find library -lsqlite3</code> during Tor build</td><td>Arti's <code>tor-dirmgr</code> uses <code>rusqlite</code> and the NDK sysroot has no libsqlite3</td><td>Already pinned in <code>relay/tor/Cargo.toml</code> via <code>rusqlite = { features = ["bundled"] }</code>; if you're patching it, keep the bundled feature.</td></tr>
+  <tr><td><code>nym-noise</code> fails with a type-inference error</td><td>Upstream nym-noise 1.20.4 has a closure parameter that needs annotation under rustc 1.83+</td><td><code>TETHERAND_NYM_SDK=0 make native-nym</code> (default; ships the JNI surface only). The <code>with-sdk</code> feature is opt-in.</td></tr>
+  <tr><td><code>ld.lld: error: unable to find library -lusb-1.0</code> during rtlsdr build</td><td>rtlsdr's CMakeLists hardcodes <code>-lusb-1.0</code> and ignores <code>LIBUSB_LIBRARIES</code></td><td>The script in <code>scripts/build-rtlsdr-android.sh</code> already passes <code>-L$WORK/libusb/build</code> via <code>CMAKE_SHARED_LINKER_FLAGS</code>.</td></tr>
+  <tr><td>Snowflake build fails with <code>link: github.com/wlynxg/anet: invalid reference to net.zoneCache</code></td><td>Upstream <code>wlynxg/anet</code> uses a Go internal symbol that moved in Go 1.26</td><td>Downgrade Go to 1.22 or 1.23 for the snowflake build; or wait for upstream to fix. v0.1 skips snowflake.</td></tr>
+</table>
+
+<h2 id="tests">Test suite</h2>
+
+<pre><code>make test       # all Rust workspace unit tests
+cd android && ./gradlew :app:testDebugUnitTest   # Kotlin unit tests</code></pre>
+
+<p>The Rust workspace ships unit tests for the codec, the bridge parser, the obfs4 cert decoder, the perplexity rule, the prompt-injection regex, and the provenance checker. The Kotlin unit tests cover the geohash6 implementation.</p>
+
+<p>Integration tests against the real Tor network live behind <code>#[ignore]</code> &mdash; run explicitly:</p>
+
+<pre><code>cd relay && cargo test -p tetherand-tor --test live_probe -- --ignored</code></pre>
+
+<p>The probe dials <code>check.torproject.org:443</code> and an .onion service. Requires internet egress to the Tor network from the test runner.</p>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

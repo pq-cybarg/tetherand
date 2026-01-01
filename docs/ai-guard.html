@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI Guard · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Deterministic primaries and contributory NPU-resident classifiers for AI-era threats. No cloud LLM calls.">
+<meta property="og:title" content="AI Guard · Tetherand">
+<meta property="og:description" content="Deterministic primaries and contributory NPU-resident classifiers for AI-era threats. No cloud LLM calls.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/ai-guard.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html" class="current">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>AI Guard</h1>
+
+<p>The AI tab houses Tetherand's defenses against AI-era threats &mdash; the class of attacks that scaled massively after the 2024 capability boom in generative models. Every defense here is constructed in two layers:</p>
+
+<ol>
+  <li>A <strong>deterministic primary</strong> &mdash; a rule, threshold, or heuristic that always applies. This is the load-bearing part. It functions correctly without any model present.</li>
+  <li>A <strong>contributory classifier</strong> &mdash; an on-device model that refines the primary's verdict and catches novel patterns. This is the advisory part. It can never trigger a destructive action on its own.</li>
+</ol>
+
+<p>This separation is non-negotiable. It exists so the app's behaviour is always auditable: every actionable decision is traceable to a rule, not a black-box model.</p>
+
+<div class="callout danger">
+  <strong>Hard constraint &mdash; local only.</strong> Every AI inference runs on the Seeker's MediaTek NPU via LiteRT (formerly TensorFlow Lite) plus the NNAPI delegate. No prompt, classification, or telemetry ever reaches a cloud LLM API under any circumstances. The egress-LLM-API watch defense enforces this for other apps installed on the device too.
+</div>
+
+<h2 id="primaries">Deterministic primaries (always engaged)</h2>
+
+<table>
+  <tr><th>Defense</th><th>What the rule does</th></tr>
+  <tr><td><strong>Prompt-injection clipboard scrubber</strong></td><td>Watches clipboard changes for known injection scaffolds &mdash; Ignore-previous-instructions, chat-template markers, common jailbreak prefixes. Surfaces a high-severity alert; does not auto-clear.</td></tr>
+  <tr><td><strong>Phishing message scorer</strong></td><td>Four-axis classifier (urgency, authority, financial-ask, URL look-alike). Two-or-more axes scoring high yields a High verdict. Catches typo-squat domains via a small Levenshtein and a cheap IDN-homoglyph swap.</td></tr>
+  <tr><td><strong>Pseudo-perplexity AI-text badge</strong></td><td>Four signals (average word length, function-word density, colloquial markers, punctuation density) combine into a heuristic "this looks AI-generated" score. Inspired by the Binoculars approach but uses no neural component.</td></tr>
+  <tr><td><strong>Provenance check</strong></td><td>Scans inbound images and video for C2PA / SynthID / Content Credentials markers. Surfaces Genuine / Synthetic / Unknown verdicts using a Boyer&ndash;Moore&ndash;Horspool needle scan over the raw bytes.</td></tr>
+  <tr><td><strong>Egress LLM-API SNI watch</strong></td><td>A rule-only watchlist of cloud LLM API hostnames (18 exact, 10 suffix-matched). Surfaces any app on the device that talks to one of these.</td></tr>
+  <tr><td><strong>MTK NPU sysfs watcher</strong></td><td>Polls <code>/sys/devices/platform/mtk_apu</code> and similar paths for NPU activity. A background app using the NPU is a red flag &mdash; covert local-model inference is a real threat.</td></tr>
+  <tr><td><strong>Voiceprint vault + safe-word handshake</strong></td><td>Trusted-contact registry stored encrypted at rest. The "verify caller" flow uses a pre-agreed safe word, hashed with SHA-256, as the verification step.</td></tr>
+  <tr><td><strong>HIBP OSINT exposure</strong></td><td>Have-I-Been-Pwned password check using the k-anonymity range API &mdash; only the first five characters of the SHA-1 of the password leave the device. Opt-in.</td></tr>
+  <tr><td><strong>Conference field guide</strong></td><td>Static catalogue of eight AI-era attacker tactics relevant to DEFCON 34. Updated through whatever privacy chain is active.</td></tr>
+</table>
+
+<h2 id="contributory">Contributory classifiers (model-driven)</h2>
+
+<p>A small ensemble of locally-running models, all INT4-quantised, all running on the Seeker's NPU via LiteRT:</p>
+
+<table>
+  <tr><th>Model</th><th>Job</th><th>Size (compressed)</th><th>Latency</th></tr>
+  <tr><td><code>phi-tetherand-3b-q4</code></td><td>Phishing / social-engineering / prompt-injection classification on inbound messages</td><td>~1.8 GB</td><td>~120 ms / message</td></tr>
+  <tr><td><code>voiceguard-v1</code></td><td>Speech-synthesis detection on inbound call audio</td><td>~30 MB</td><td>~40 ms / second of audio</td></tr>
+  <tr><td><code>textguard-v1</code></td><td>LLM-generated text detection (Binoculars-style ensemble)</td><td>~20 MB</td><td>~60 ms / message</td></tr>
+  <tr><td><code>qrguard-v1</code></td><td>Adversarial QR / image lure detection</td><td>~8 MB</td><td>~30 ms / image</td></tr>
+</table>
+
+<p>The four-model bundle (~2.4 GB compressed) is <strong>not</strong> included in the v0.1 APK. It ships separately through the in-app delta-update path, delivered over the active privacy chain only, signed against a cosign public key pinned in the APK. Until then the AI tab shows "Not bundled &mdash; deterministic core in effect" for each row, and the deterministic primaries handle every decision.</p>
+
+<h2 id="ai-tab">Reading the AI tab</h2>
+
+<p>The top of the page shows a <code>models X/Y</code> counter &mdash; how many of the four contributory models are loaded.</p>
+<p>The middle section lists deterministic primaries, each with a green-dot indicator confirming it is engaged.</p>
+<p>The bottom of the page surfaces user-facing tools:</p>
+<ul>
+  <li><strong>Egress LLM-API scan</strong> &mdash; paste any DNS-query log you have (from AdGuard, PCAPdroid, etc) and the watchlist flags every hit.</li>
+  <li><strong>Verify-caller handshake</strong> &mdash; register a phone number with a safe-word hash; when you suspect a deepfake call, use the safe word to cross-verify.</li>
+  <li><strong>OSINT exposure</strong> &mdash; opt-in HIBP password check.</li>
+  <li><strong>Field guide</strong> &mdash; current AI-era attacker tactics.</li>
+</ul>
+
+<h2 id="threats">AI-era threats Tetherand counters</h2>
+
+<table>
+  <tr><th>Threat</th><th>Counter</th></tr>
+  <tr><td>Voice deepfake on call</td><td>Safe-word handshake (deterministic) + <code>voiceguard-v1</code> synthesis-artefact score</td></tr>
+  <tr><td>Vishing scaffold</td><td>Conversation-state rules (urgency + authority + secrecy + financial-ask + channel-mismatch)</td></tr>
+  <tr><td>LLM-generated text in a message</td><td>Open-algorithm perplexity test + <code>textguard-v1</code></td></tr>
+  <tr><td>Adversarial QR or image lure</td><td>URL-pattern + perceptual-hash blocklist + <code>qrguard-v1</code></td></tr>
+  <tr><td>Prompt injection via shared text</td><td>Regex match against known scaffolds &rarr; clipboard scrubber alert</td></tr>
+  <tr><td>Synthetic-media provenance check</td><td>C2PA / SynthID / Content Credentials signature verify (cryptographic)</td></tr>
+  <tr><td>Covert local-model use by background app</td><td>MTK NPU sysfs watcher with foreground-app correlation</td></tr>
+  <tr><td>Egress to cloud LLM APIs</td><td>SNI watchlist (rule-only)</td></tr>
+  <tr><td>Personalised phishing from your OSINT</td><td>HIBP exposure dashboard + phishing-rule message classifier</td></tr>
+</table>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
