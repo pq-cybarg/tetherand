@@ -18,6 +18,10 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s"/>
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- M9.x ultrasonic-beacon listener (cross-device tracking detector,
+         18-22 kHz band). Runtime-prompted via Compose when Hardened
+         Mode arms; listener no-ops cleanly if denied. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <application
         android:label="Tetherand"

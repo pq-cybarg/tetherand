@@ -6,7 +6,9 @@ import dev.tetherand.app.aiguard.clipboard.ClipboardScrubberService
 import dev.tetherand.app.hardened.deadman.DeadmansSwitch
 import dev.tetherand.app.hardened.decoy.DecoyListenerService
 import dev.tetherand.app.hardened.tamper.TamperWatcher
+import dev.tetherand.app.hardened.ultrasonic.UltrasonicListener
 import dev.tetherand.app.threat.collector.AppAudit
+import dev.tetherand.app.threat.heuristic.ThreatSuppressions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +22,7 @@ data class HardenedDefense(val id: String, val displayName: String, val state: S
 class HardenedModeManager(private val ctx: Context) {
     private val store = HardenedModeStore(ctx)
     private val tamper = TamperWatcher(ctx)
+    private val ultrasonic = UltrasonicListener(ctx)
     val deadman = DeadmansSwitch(ctx)
     private val _state = MutableStateFlow(store.active)
     val active: StateFlow<Boolean> = _state.asStateFlow()
@@ -49,6 +52,13 @@ class HardenedModeManager(private val ctx: Context) {
         tamper.start()
         // 4b. Start the dead-man's switch (no-op if disabled in its config).
         deadman.start()
+        // 4c. Start the ultrasonic-beacon listener (no-op if RECORD_AUDIO missing).
+        ultrasonic.start()
+        // 4d. Wipe heuristic suppressions — DEFCON posture should be
+        // strict, so any opt-outs the user set during dev work get
+        // cleared on entry. They can re-enable individual ones after
+        // confirming the conference environment is benign.
+        ThreatSuppressions(ctx).clearAll()
         // 5. Persist + emit state.
         store.active = true
         _state.value = true
@@ -63,6 +73,7 @@ class HardenedModeManager(private val ctx: Context) {
         ctx.startService(Intent(ctx, ClipboardScrubberService::class.java)
             .setAction(ClipboardScrubberService.ACTION_STOP))
         tamper.stop()
+        ultrasonic.stop()
         deadman.stop()
         store.active = false
         _state.value = false
@@ -81,6 +92,8 @@ class HardenedModeManager(private val ctx: Context) {
             HardenedDefense("tamper", "Accelerometer tamper-watcher armed",
                 if (on) HardenedDefense.State.Active else HardenedDefense.State.NeedsUserAction),
             HardenedDefense("clipboard_scrubber", "Prompt-injection clipboard scrubber",
+                if (on) HardenedDefense.State.Active else HardenedDefense.State.NeedsUserAction),
+            HardenedDefense("ultrasonic", "Ultrasonic-beacon listener (18-22 kHz)",
                 if (on) HardenedDefense.State.Active else HardenedDefense.State.NeedsUserAction),
             HardenedDefense("vpn_lockdown", "VPN always-on + block-without-VPN",
                 HardenedDefense.State.NeedsUserAction),
