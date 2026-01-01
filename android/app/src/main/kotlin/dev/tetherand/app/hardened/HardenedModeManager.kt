@@ -2,6 +2,7 @@ package dev.tetherand.app.hardened
 
 import android.content.Context
 import android.content.Intent
+import dev.tetherand.app.aiguard.clipboard.ClipboardScrubberService
 import dev.tetherand.app.hardened.decoy.DecoyListenerService
 import dev.tetherand.app.hardened.tamper.TamperWatcher
 import dev.tetherand.app.threat.collector.AppAudit
@@ -37,6 +38,11 @@ class HardenedModeManager(private val ctx: Context) {
         }.toString()
         // 3. Start the honeypot.
         ctx.startForegroundService(Intent(ctx, DecoyListenerService::class.java))
+        // 3b. Start the M10 clipboard scrubber. While DEFCON Mode is on
+        // we watch every clip change for prompt-injection scaffolds —
+        // catches attacker-prepared text aimed at any LLM agent the user
+        // happens to paste it into. Deterministic regex; no model needed.
+        ctx.startForegroundService(Intent(ctx, ClipboardScrubberService::class.java))
         // 4. Arm the tamper watcher.
         tamper.start()
         // 5. Persist + emit state.
@@ -50,6 +56,8 @@ class HardenedModeManager(private val ctx: Context) {
         store.postSnapshotJson = AttestationSnapshot.capture(ctx)
         ctx.startService(Intent(ctx, DecoyListenerService::class.java)
             .setAction(DecoyListenerService.ACTION_STOP))
+        ctx.startService(Intent(ctx, ClipboardScrubberService::class.java)
+            .setAction(ClipboardScrubberService.ACTION_STOP))
         tamper.stop()
         store.active = false
         _state.value = false
@@ -66,6 +74,8 @@ class HardenedModeManager(private val ctx: Context) {
             HardenedDefense("honeypot", "Decoy listeners on 6 ports",
                 if (on) HardenedDefense.State.Active else HardenedDefense.State.NeedsUserAction),
             HardenedDefense("tamper", "Accelerometer tamper-watcher armed",
+                if (on) HardenedDefense.State.Active else HardenedDefense.State.NeedsUserAction),
+            HardenedDefense("clipboard_scrubber", "Prompt-injection clipboard scrubber",
                 if (on) HardenedDefense.State.Active else HardenedDefense.State.NeedsUserAction),
             HardenedDefense("vpn_lockdown", "VPN always-on + block-without-VPN",
                 HardenedDefense.State.NeedsUserAction),
