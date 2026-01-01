@@ -67,6 +67,14 @@ fun PrivacyScreen(onStart: (String, Boolean) -> Unit, onStop: () -> Unit) {
     val splitStore = remember { dev.tetherand.app.splittunnel.SplitTunnelStore(ctx) }
     var disallowed by remember { mutableStateOf(splitStore.disallowed()) }
     var showAppPicker by remember { mutableStateOf(false) }
+    // M6 Tor hop config — bridges + vanguards + PQ-NTor preference.
+    val torStore = remember { dev.tetherand.app.tor.TorBridges(ctx) }
+    val initialTor = remember { torStore.load() }
+    var torEnabled by remember { mutableStateOf(false) }
+    var torBridges by remember { mutableStateOf(initialTor.bridges.joinToString("\n")) }
+    var torVanguards by remember { mutableStateOf(initialTor.vanguards) }
+    var torPreferPq by remember { mutableStateOf(initialTor.preferPqHandshake) }
+    var torStatus by remember { mutableStateOf<String?>(null) }
     val scroll = rememberScrollState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -298,6 +306,54 @@ fun PrivacyScreen(onStart: (String, Boolean) -> Unit, onStop: () -> Unit) {
                     textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
                     label = { Text("conf") },
                 )
+            }
+        }
+
+        // M6 Tor hop card — config + save. The chain orchestrator wiring
+        // (Tor as an additional hop alongside WG) ships in M6.x once the
+        // per-flow IP→arti DataStream forwarder lands. v1 surfaces the
+        // config + persists it under EncryptedSharedPreferences so the
+        // moment the forwarder lands the user's config is already there.
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Tor (Arti)", fontWeight = FontWeight.SemiBold,
+                         color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                    Spacer(Modifier.weight(1f))
+                    Switch(checked = torEnabled, onCheckedChange = { torEnabled = it })
+                }
+                Text("Tor as a chain hop, backed by an embedded arti-client 0.27. " +
+                     "Pluggable transports (obfs4 / snowflake / meek / webtunnel / conjure) ship as M6.x sub-plans.",
+                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontSize = 11.sp)
+                OutlinedTextField(
+                    value = torBridges, onValueChange = { torBridges = it },
+                    label = { Text("Bridge lines (BridgeDB format, one per line)") },
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = torVanguards, onCheckedChange = { torVanguards = it })
+                    Spacer(Modifier.padding(end = 8.dp))
+                    Text("Vanguards — entry-guard hardening", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = torPreferPq, onCheckedChange = { torPreferPq = it })
+                    Spacer(Modifier.padding(end = 8.dp))
+                    Text("Prefer PQ-NTor handshake (prop362 / NTor-ML-KEM-v1)", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                }
+                Button(modifier = Modifier.fillMaxWidth(), onClick = {
+                    val lines = torBridges.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                    torStore.save(dev.tetherand.app.tor.TorConfig(
+                        bridges = lines,
+                        vanguards = torVanguards,
+                        preferPqHandshake = torPreferPq,
+                    ))
+                    torStatus = "Saved ${lines.size} bridge(s); vanguards=$torVanguards; pq=$torPreferPq"
+                }) { Text("Save Tor config", fontSize = 12.sp, fontFamily = FontFamily.Monospace) }
+                if (torStatus != null) {
+                    Text(torStatus!!, fontFamily = FontFamily.Monospace, fontSize = 10.sp,
+                         color = MaterialTheme.colorScheme.primary)
+                }
             }
         }
 
