@@ -67,6 +67,12 @@ fun ThreatScreen() {
             }
         }
 
+        // M9 Hardened Mode — DEFCON profile + incident-response runbook.
+        // Inserted between detection-mode and the panic-button so the
+        // user-action checklist sits above the kill-switch.
+        dev.tetherand.app.hardened.ui.HardenedSection()
+        dev.tetherand.app.hardened.ui.IncidentResponseCard()
+
         PanicButton()
 
         Text(
