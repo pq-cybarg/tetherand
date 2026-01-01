@@ -51,9 +51,16 @@ object TcpPacketBuilder {
         ack: Long,
         window: Int = 65535,
         payload: ByteArray = EMPTY_PAYLOAD,
+        options: ByteArray = EMPTY_OPTIONS,
     ): ByteArray {
         val ihl = 20         // IP header length (no options)
-        val tcphl = 20       // TCP header length (no options — we don't advertise WSCALE etc.)
+        // Options block must be 4-byte aligned (RFC 9293 §3.1). The
+        // caller's [options] is the raw kind/length/value triple stream;
+        // we right-pad with NOPs (kind = 1) so the data-offset field
+        // expresses an integral number of 4-byte words.
+        val optsPadLen = if (options.isEmpty()) 0 else ((options.size + 3) and 3.inv()) - options.size
+        val tcpOptsLen = options.size + optsPadLen
+        val tcphl = 20 + tcpOptsLen
         val totalLen = ihl + tcphl + payload.size
         val out = ByteArray(totalLen)
 
@@ -108,6 +115,16 @@ object TcpPacketBuilder {
         out[tcpOff + 16] = 0; out[tcpOff + 17] = 0
         // Urgent pointer
         out[tcpOff + 18] = 0; out[tcpOff + 19] = 0
+
+        // ---- TCP options (immediately after the fixed 20-byte header) ----
+        if (tcpOptsLen > 0) {
+            System.arraycopy(options, 0, out, tcpOff + 20, options.size)
+            // Right-pad with NOPs (kind = 1) to a 4-byte boundary so the
+            // data-offset reflects an integral word count.
+            for (p in 0 until optsPadLen) {
+                out[tcpOff + 20 + options.size + p] = 1
+            }
+        }
 
         // ---- Payload ----
         if (payload.isNotEmpty()) {
@@ -220,4 +237,125 @@ object TcpPacketBuilder {
     }
 
     private val EMPTY_PAYLOAD = ByteArray(0)
+    private val EMPTY_OPTIONS = ByteArray(0)
+
+    /**
+     * Build a SYN-ACK options block advertising our MSS + Window-Scale +
+     * (optionally) SACK-Permitted. Used by [TorFlowForwarder] when it
+     * synthesises the SYN-ACK in response to the device's SYN.
+     *
+     *   - **MSS**:  kind=2  len=4  value=u16 (we advertise 1220 by
+     *               default — that's a Tor-cell-friendly upper bound
+     *               after IP+TCP+arti framing on a typical 1500-MTU path).
+     *   - **WSCALE**: kind=3  len=3  value=u8 (we advertise scale 0,
+     *               i.e. raw 16-bit window. We could go higher but
+     *               the synthetic-remote side has no real receive
+     *               buffer to protect; the device is what we shovel
+     *               INTO, so its WSCALE matters and ours is symbolic).
+     *   - **SACK_PERM**: kind=4  len=2 — toggled by [sackPermitted].
+     *               When advertised, the device may emit SACK option
+     *               blocks (kind=5) in its ACKs. We don't currently
+     *               consume those; advertising is harmless because
+     *               SACK is incremental information, not required.
+     *
+     * Caller passes this to [build]'s `options` parameter.
+     */
+    fun buildSynAckOptions(
+        ourMss: Int = 1220,
+        ourWscale: Int = 0,
+        sackPermitted: Boolean = true,
+    ): ByteArray {
+        // MSS = 4 bytes, WSCALE = 3 bytes, SACK_PERM = 2 bytes,
+        // optional NOP padding adds 0-3 bytes. We don't pre-NOP-pad
+        // here — build() pads to the 4-byte boundary on emit.
+        val sackLen = if (sackPermitted) 2 else 0
+        val out = ByteArray(4 + 3 + sackLen)
+        // MSS
+        out[0] = 2
+        out[1] = 4
+        out[2] = ((ourMss ushr 8) and 0xFF).toByte()
+        out[3] = (ourMss and 0xFF).toByte()
+        // WSCALE
+        out[4] = 3
+        out[5] = 3
+        out[6] = (ourWscale and 0xFF).toByte()
+        // SACK_PERMITTED (if requested)
+        if (sackPermitted) {
+            out[7] = 4
+            out[8] = 2
+        }
+        return out
+    }
+
+    /**
+     * TCP option types we recognise. See RFC 9293 §3.2 and IANA TCP
+     * option registry. Unknown kinds get skipped per the length byte.
+     */
+    object OptionKind {
+        const val EOL = 0
+        const val NOP = 1
+        const val MSS = 2
+        const val WSCALE = 3
+        const val SACK_PERMITTED = 4
+        const val SACK = 5
+        const val TIMESTAMPS = 8
+    }
+
+    /**
+     * Parsed options from an inbound SYN. We capture the device's
+     * MSS, WSCALE exponent, and SACK-Permitted flag so the forwarder
+     * can mirror them in the synthetic SYN-ACK and apply the
+     * advertised window-scale to subsequent ACK windows.
+     *
+     * Defaults match RFC 9293 fallback behaviour: MSS=536 (the
+     * floor for IPv4 over Ethernet without options), WSCALE=0
+     * (no scaling — interpret window field as raw 16-bit value),
+     * SACK_PERMITTED=false.
+     */
+    data class ParsedOptions(
+        val mss: Int = 536,
+        val wscale: Int = 0,
+        val sackPermitted: Boolean = false,
+    )
+
+    /**
+     * Parse a TCP options blob (the bytes between the fixed 20-byte
+     * header and the payload). Length-prefixed TLV format per RFC 9293
+     * §3.2. Tolerates unknown kinds by skipping `length-2` bytes.
+     */
+    fun parseOptions(buf: ByteArray, offset: Int, len: Int): ParsedOptions {
+        var mss = 536
+        var wscale = 0
+        var sackPerm = false
+        var i = offset
+        val end = offset + len
+        while (i < end) {
+            val kind = buf[i].toInt() and 0xFF
+            when (kind) {
+                OptionKind.EOL -> return ParsedOptions(mss, wscale, sackPerm)
+                OptionKind.NOP -> i += 1
+                else -> {
+                    if (i + 1 >= end) return ParsedOptions(mss, wscale, sackPerm)
+                    val length = buf[i + 1].toInt() and 0xFF
+                    if (length < 2 || i + length > end) {
+                        // Malformed length — bail safely.
+                        return ParsedOptions(mss, wscale, sackPerm)
+                    }
+                    when (kind) {
+                        OptionKind.MSS -> if (length == 4) {
+                            mss = ((buf[i + 2].toInt() and 0xFF) shl 8) or (buf[i + 3].toInt() and 0xFF)
+                        }
+                        OptionKind.WSCALE -> if (length == 3) {
+                            // RFC 7323: max legal WSCALE exponent is 14.
+                            wscale = (buf[i + 2].toInt() and 0xFF).coerceIn(0, 14)
+                        }
+                        OptionKind.SACK_PERMITTED -> if (length == 2) sackPerm = true
+                        // SACK / TIMESTAMPS / unknowns — skip silently
+                    }
+                    i += length
+                }
+            }
+        }
+        return ParsedOptions(mss, wscale, sackPerm)
+    }
 }
