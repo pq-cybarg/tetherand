@@ -36,11 +36,13 @@ fun TabbedRoot(
                 Tab(selected = selected == 0, onClick = { selected = 0 }, text = { Text("Tether", fontFamily = FontFamily.Monospace) })
                 Tab(selected = selected == 1, onClick = { selected = 1 }, text = { Text("Privacy", fontFamily = FontFamily.Monospace) })
                 Tab(selected = selected == 2, onClick = { selected = 2 }, text = { Text("Threat", fontFamily = FontFamily.Monospace) })
+                Tab(selected = selected == 3, onClick = { selected = 3 }, text = { Text("AI", fontFamily = FontFamily.Monospace) })
             }
             when (selected) {
                 0 -> TetherScreen(onStart = onTetherStart, onStop = onTetherStop)
                 1 -> PrivacyScreen(onStart = onChainStart, onStop = onChainStop)
                 2 -> dev.tetherand.app.threat.ui.ThreatScreen()
+                3 -> dev.tetherand.app.aiguard.ui.AiTab()
             }
         }
     }
