@@ -8,7 +8,18 @@ use std::sync::Mutex;
 use boringtun::noise::{Tunn, TunnResult};
 
 pub mod peer;
+pub mod kem;
 pub use peer::{ParseError, WgPeerConfig};
+pub use kem::{KemKeypair, CIPHERTEXT_BYTES, PUBLIC_KEY_BYTES, SHARED_SECRET_BYTES};
+
+/// Generate a fresh X25519 keypair (32-byte private, 32-byte public).
+/// Used by the Mullvad device-registration flow on the Kotlin side.
+pub fn generate_x25519_keypair() -> ([u8; 32], [u8; 32]) {
+    use rand::rngs::OsRng;
+    let secret = x25519_dalek::StaticSecret::random_from_rng(OsRng);
+    let public = x25519_dalek::PublicKey::from(&secret);
+    (secret.to_bytes(), public.to_bytes())
+}
 
 #[cfg(target_os = "android")]
 mod jni;
