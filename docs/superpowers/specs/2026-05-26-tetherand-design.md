@@ -27,7 +27,14 @@ All three subsystems are independently shippable and testable.
 
 Fork Gnirehtet (Genymobile, GPL-3) for the tether subsystem — its Java VpnService client + Rust userspace TCP/IP relay are battle-tested. Rebrand under `dev.tetherand.*`. Wrap a transport-abstraction layer around the existing USB-ADB transport, then add USB-AOA / Bluetooth RFCOMM / TCP siblings. Replace the Android client with a modern Kotlin + Compose app. The privacy and threat subsystems are net-new.
 
-License inherited: GPL-3 for code derived from Gnirehtet (relay core + initial Android service shell). New code (Compose UI, threat detector, privacy chain orchestrator) starts as GPL-3-compatible (MPL-2 candidate) until/unless the relay core is rewritten clean-room post-launch.
+License inheritance, by subsystem:
+
+- **Tether (M1-M2):** Gnirehtet is **Apache-2.0** (verified against `upstream/LICENSE`). Tetherand's forked relay core and Android service shell stay under Apache-2.0 — no GPL inheritance from this base. New code in this subsystem ships Apache-2.0.
+- **Threat Detection (M7):** AIMSICD, SnoopSnitch, NetMonster-core, and Crocodile Hunter are all GPLv3. Code ported from these projects converges the Threat Detection module to GPLv3.
+- **Privacy Chain (M3-M6):** WireGuard userspace (`wireguard-android` / `wg-go`) is MIT + Apache-2.0; Mullvad's open libraries are GPLv3; NymVPN client is GPLv3 (the official client) or Apache-2.0 (the Rust library `nym-vpn-lib` — verify per module at integration); Tor is BSD-3. Linking GPLv3 (Mullvad's Kotlin SDK, Nym client) pulls the resulting binary to GPLv3.
+- **Whole APK:** Because M7 + parts of M3-M6 are GPLv3, the shipped Tetherand APK as a whole is GPLv3 once those modules link in. The M1 APK alone (no privacy chain, no threat detection) can ship as Apache-2.0.
+
+`NOTICE` and `LICENSE` files document this per module. We do not relicense GPLv3 code; we accept the convergence.
 
 ## Architecture
 
