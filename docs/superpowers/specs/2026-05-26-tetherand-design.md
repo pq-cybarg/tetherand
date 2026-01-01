@@ -18,11 +18,10 @@ All three subsystems are independently shippable and testable.
 
 ## Non-Goals
 
-- Linux/Windows host support in v1 (Mac only; CLI is Rust so porting is mostly transport-impl work).
-- IPv6 in v1 (Gnirehtet's stack is IPv4-only; smoltcp migration is a follow-up).
-- Rooting or unlocking the bootloader.
-- Detection of attacks that fundamentally require baseband access on MediaTek (full Qualcomm-style `/dev/diag` analysis is out of scope; we use what `TelephonyManager` exposes plus heuristics).
-- Cloud sync, telemetry, or any data leaving the device.
+- Linux/Windows host support before DEFCON (Mac only; CLI is Rust so porting is mostly transport-impl work — open after the conference).
+- Rooting or unlocking the bootloader (Tier 2 root-only detection paths are architected and auto-engage if the user later roots).
+- Cloud sync, telemetry, or any data leaving the device — period.
+- Any defence that requires breaking another app's TLS (we inspect handshakes at the IP layer; we do not MITM).
 
 ## Base Approach
 
@@ -100,6 +99,19 @@ reverse-tethering/
 │   │       ├── heuristic/{aimsicd,snoopsnitch,crocodile,ours}/
 │   │       ├── tower/                # OpenCellID Room DB + EARFCN allocations
 │   │       └── sdr/                  # JNI to libtetherand-sdr.so (rtl-sdr / hackrf)
+│   ├── aiguard/                      # AI-era defences (M10)
+│   │   └── src/main/kotlin/dev/tetherand/aiguard/
+│   │       ├── runtime/              # LiteRT + NNAPI delegate, MediaTek NPU
+│   │       ├── classifier/{phi,voice,text,qr}/
+│   │       ├── voiceprint/           # trusted-contact voiceprint vault
+│   │       ├── clipboard/            # prompt-injection scrubber
+│   │       ├── provenance/           # C2PA / SynthID / Content Credentials
+│   │       └── osint/                # exposure dashboard via Privacy Chain
+│   ├── ai-models/                    # Quantised model assets, in-APK
+│   │   ├── phi-tetherand-3b-q4.litertmodel
+│   │   ├── voiceguard-v1.litertmodel
+│   │   ├── textguard-v1.litertmodel
+│   │   └── qrguard-v1.litertmodel
 │   └── native/                       # Rust → JNI shared codec + WG hooks
 ├── relay/                            # Cargo workspace (Mac side)
 │   ├── core/                         # Userspace TCP/IP (forked Gnirehtet relay-rust)
@@ -370,6 +382,267 @@ Threat tab:
 
 No data leaves the device. Baselines stored in `EncryptedSharedPreferences` with hardware-backed keystore. Alerts stored in a local Room database, auto-pruned > 30 days unless the user pins them. Export-on-demand only.
 
+## Hardened Mode (DEFCON Profile)
+
+DEFCON's network is famously the most hostile WiFi/cellular environment in the world: Stingrays, Wi-Fi Pineapples on drones, KARMA, deauth floods, evil twins, juice-jacking cables in the hotel, hostile USB drops in vendor village, BLE trackers attached to bags, and an audience explicitly trying to find unpatched things. The Solana Seeker adds a crypto-wallet target on top.
+
+The defaults the rest of the spec describes are good for everyday use. Hardened Mode is a one-tap profile that turns the volume to 11 on every defense and adds capabilities only relevant in adversarial environments.
+
+### Activation
+
+One tile in Quick Settings + a slider on the Threat tab. Toggling on:
+1. Captures a **pre-conference attestation snapshot** (see below) — required first time.
+2. Applies all hardening actions atomically — partial activation is not allowed; if any required step fails, rolls back.
+3. Persistent foreground notification with "DEFCON Mode active — X defenses live" plus a 1-tap deactivate.
+
+Toggling off:
+1. Captures a **post-conference attestation snapshot**.
+2. Diff against pre-snapshot; shows changes (new apps, new admins, new CAs, hardware-attestation drift, boot count delta, etc.).
+3. Restores prior settings (with confirmation).
+
+### Defenses Engaged
+
+**Network — kill switch and chain enforcement**
+- **Always-on VPN through Privacy Chain**, with Android's `alwaysOn` + `lockdown` flags set programmatically (we are the active VpnService, so this is just our own config). Lockdown means *zero* traffic leaves the device when the VPN is down — no leaks, no DNS punch-through, no captive-portal exception.
+- **Forced Tor chain**: Hardened Mode replaces whatever the active chain was with `wg(mullvad-pq, multihop, far-from-vegas) → tor(snowflake+conjure bridges, vanguards, isolate-by-destination)`.
+- **Per-app firewall**: all non-essential apps lose `INTERNET` capability via per-UID blackhole rules in our VpnService. User picks the allowlist before entering DEFCON; defaults to: Tetherand, Signal, system clock sync. Everything else is offline.
+- **Block cleartext traffic**: VpnService inspects and drops plaintext HTTP/IMAP/POP3 attempts and surfaces the offending app.
+- **DNS hardening**: DNS-over-HTTPS through the chain's exit, with system DNS blackholed. Local DNS sinkhole bundled — blocks ad/tracker/known-malicious domains (`StevenBlack/hosts` list, periodically refreshed through chain).
+- **RFC1918 leak detector**: alerts on any traffic destined for `10/8`, `172.16/12`, `192.168/16` that's not the captive-portal probe (which is also disabled).
+- **Outbound port allowlist**: blocks ports < 1024 outside 53/80/443 unless explicitly permitted.
+
+**Network — honeypots and probes**
+- **Decoy listeners**: bind unprivileged decoy ports (8080, 8443, 8000, 9000, 1080, 3128) and log every connection attempt with peer IP + ASN + reverse-DNS-via-chain. Scans light up the Threat tab in red.
+- **Honeytokens**: ship 3 baited files in `Downloads/` (`backup.pdf`, `keys.txt`, `seed-phrase.txt`) with `FileObserver` watching for access. Anything touching them = compromise.
+- **Pineapple signatures**: known Wi-Fi Pineapple firmware OUI list + behavior signatures (mass-PNL responses to probe requests). Updated quarterly with the EARFCN/OpenCellID bundle.
+
+**Cellular hardening**
+- **Force LTE-only (no 2G/3G fallback)**: writes `Settings.Global.PREFERRED_NETWORK_MODE` to LTE-only via system intent; if denied, prompts user to do it in Settings. 2G is where IMSI catchers live; refusing 2G removes most attack value.
+- **SIM PIN required**: prompts user to enable.
+- **Operator change alert**: alerts if `TelephonyManager.getSimOperator()` deviates from baseline.
+- **IMSI/IMEI/TMSI watch**: alerts if `SubscriberId` or `DeviceId` (where exposed) deviates; logs every TMSI cycle.
+- **Carrier-config-change alert**: snapshots `CarrierConfigManager.getConfig()` and diffs each hour. Hostile carrier-config push is a known attack vector.
+- **Pre-conference cell-baseline capture**: drives around campus / hotel and logs the cell environment so the threat engine has ground truth; runs in background during the drive.
+
+**Wi-Fi defenses**
+- **Forget all saved networks** (with backup): no network in the saved list = no KARMA attack value.
+- **Auto-join disabled globally.**
+- **MAC randomization forced** even for the rare networks you do join.
+- **Pineapple / evil-twin / deauth / beacon-flood detection**: heuristics from Threat Detection, with severity inflated in Hardened Mode.
+- **Probe-request minimization**: where Android exposes it (some OEMs do, MTK partially does via reflection), disable active probing — only passive scan.
+
+**Bluetooth defenses**
+- **Off by default** in Hardened Mode. Allowlist of paired devices (your YubiKey, your watch) can be re-enabled per-device.
+- **BLE tracker scan on demand**: tap a "Scan for trackers" button — runs `BluetoothLeScanner` looking for AirTag (Apple Find My), Tile, Samsung SmartTag, Pebblebee, Chipolo, generic AltBeacon stalkerware patterns. Surfaces RSSI-vs-time graphs to show if something's been near you for a long time.
+- **Name randomization**: device name set to a random alphanumeric on entry to Hardened Mode (and restored on exit).
+- **BlueBorne / pairing-request flood detection**: count rejected pairing requests.
+
+**NFC**
+- **NFC off** in Hardened Mode. (DEFCON has had NFC-malware demos.)
+
+**USB defenses**
+- **Data block when locked**: USB switches to charge-only mode when screen is locked. Achieved by toggling `setting global development_settings_enabled` and the USB-data sysprop via our (Mac-tethered, ADB-channel) helper; if not available, alerts user to manually verify.
+- **VID/PID allowlist**: only enumerated, known-good USB devices (your Mac, your SDR, your YubiKey) trigger any handler. Unknown VID/PID → log + alert + ignore.
+- **Power-trace anomaly detection**: `BatteryManager.BATTERY_PROPERTY_CURRENT_NOW` polled at 1 Hz; alert on charging current spikes inconsistent with the negotiated PD profile (data-line activity often correlates).
+- **Charge-port watcher**: detect plug/unplug events while screen is locked → photo via front camera (see Physical below).
+- **ADB authorization audit**: enumerate authorized ADB host keys (`/data/misc/adb/adb_keys` is root-only; alternative is `Settings.Global.ADB_ALLOWED_CONNECTION_TIME` + manual review on each new prompt).
+
+**App / process defenses**
+- **Snapshot + diff** of every installed package, version, signature hash, and granted permission on entry to Hardened Mode. Diff on every screen unlock thereafter. New app = critical alert. New permission = high alert.
+- **Accessibility-service freeze**: alert + block any change to the accessibility-service list (a common malware persistence mechanism).
+- **Device-admin freeze**: same for `DevicePolicyManager.getActiveAdmins()`.
+- **System-trust-store freeze**: any new root CA = critical alert.
+- **Battery-usage anomaly**: `UsageStatsManager` snapshot diff — apps drawing significantly more battery than baseline get flagged.
+- **Background-process scan**: list everything Android lets us see via `ActivityManager.getRunningAppProcesses()` (limited on Android 11+) and `UsageStatsManager.queryEvents()`; flag novel processes.
+
+**Sensor / IO defenses**
+- **Mic / cam persistent indicator**: foreground notification showing the live list of apps with mic / cam access. Android 12+ already surfaces this in the status bar; we duplicate it in the persistent Hardened-Mode notification.
+- **Auto-revoke mic/cam from unused apps** the moment they go background.
+- **Location off** except for Tetherand's own threat detector.
+- **Clipboard scrub**: clipboard cleared every 30 s of inactivity; alert on any clipboard read by an app other than what the user just pasted into.
+- **Screenshot watch**: detect screenshot events (via `FileObserver` on `Pictures/Screenshots/`) and confirm they were user-initiated (via `KeyguardManager` and recent touch state).
+
+**Physical / anti-evil-maid**
+- **Front-cam selfie on failed unlock**: after N failed unlock attempts in Hardened Mode, take a photo via front cam and save with timestamp + location. If you weren't there, you'll know who tried.
+- **Front-cam selfie on USB-data plug while locked**: same trigger; juice-jacker selfie.
+- **Accelerometer-tamper**: when device has been still for > 5 minutes (placed down), monitor accelerometer for pickup. On pickup-while-locked → log event + take selfie + require PIN (no biometric).
+- **Biometrics disabled in Hardened Mode**: PIN/password only. Biometrics can be physically compelled in many jurisdictions; passwords usually cannot.
+- **Lockdown mode**: invoke Android's built-in `KeyguardManager`-level lockdown which disables biometric unlock, notification preview, and Smart Lock until the next password unlock.
+- **Show-on-lockscreen disabled**: notifications redact contents on the lock screen.
+
+**Crypto wallet (Solana Seeker-specific)**
+- **Pre-DEFCON wallet migration prompt**: surfaces in Hardened Mode toggle — "Move your Solana keys off-device before the conference." Walks user through Seed Vault export to a Saga / hardware wallet, or a fresh paper-only mnemonic stored offsite.
+- **Seed Vault freeze**: monitors the Solana Mobile Stack Seed Vault for any access attempt; alerts on unsolicited reads.
+- **dApp store monitor**: snapshots installed Solana dApps; new install = critical (high targeted-malware risk in this audience).
+- **Transaction firewall**: any transaction signing request while Hardened Mode is on requires a 30-second cool-down and explicit re-PIN. Blocks 0-click drains.
+- **Recommend: leave the Seeker's primary keys at home.** Bring a freshly-flashed device with empty Seed Vault if you must transact.
+
+**Counter-surveillance**
+- **Ultrasonic-beacon listener**: 1-second mic samples every 5 minutes, FFT for tones in 18-22 kHz band (common ad-network ultrasonic beacon range); alert on detected tones. Listen only — never record speech.
+- **BLE proximity-tracker**: continuously scan for BLE devices that follow you across location bins (geohash6 changes); a persistent BLE MAC across many geohashes = likely tracker.
+- **Wi-Fi probe-request leakage detector**: as noted; if Android exposes outbound probes via reflection, log and alert.
+- **TLS-cert pinning audit**: known sites (Mullvad, Signal, GitHub, your bank) have pinned cert fingerprints; alert on any change. (Functions only for traffic going through our VpnService; we can inspect TLS handshakes by parsing TLS-ClientHello / Server SNI / cert chain — without breaking TLS — at the IP layer.)
+
+**Power / battery**
+- **Battery health snapshot** before/after.
+- **Charge-cycle audit**: too many cycles overnight = device-was-plugged-in-untrusted-cable.
+- **Only-when-screen-on charging**: optional — refuse to charge while screen is off in Hardened Mode (we can fake-discharge via `BatteryManager` userspace tricks; limited effect, but visible).
+
+**Recovery / resilience**
+- **Encrypted pre-DEFCON backup to Mac**: full local backup over the tether — all settings (global/secure/system), every installed APK, all user storage (Pictures/DCIM/Movies/Music/Documents/Download), permission grants, signing-cert fingerprints, device fingerprint and baseband — packaged into one `.tar.gz.enc` (AES-256-CBC, PBKDF2 600k iterations, user passphrase). SHA-256 manifest of every file inside. Available **today** via `./backup.sh`. Restore via `./restore.sh <archive>` with mode-restricted variants (`--settings-only`, `--apks-only`, `--media-only`) and a `--undo` flag that captures the pre-restore state so the restore itself is reversible. Documented limits: hardware-keystore-backed keys and apps that refuse `adb backup` (most modern privacy apps) are not in scope — those follow their own backup procedures.
+- **Dead-man's switch (optional)**: if user doesn't check in within N hours, send a Signal message to a chosen contact / trigger remote wipe / trigger Solana-key revoke. Off by default; configured explicitly.
+- **Hardware-key unlock fallback**: support YubiKey (USB-C) for unlock challenge — even if face/PIN are compelled, the YubiKey isn't on you.
+- **Multi-factor escape mode**: a hidden second profile with decoy data; specific PIN unlocks it instead of the real one. Useful at borders / under coercion.
+
+### Pre / Post Conference Attestation
+
+A snapshot taken on Hardened Mode entry and again on exit:
+
+| Field | How |
+|---|---|
+| Hardware attestation | `KeyStore.getInstance("AndroidKeyStore")` + `KeyAttestation` chain; root key signed by Google attestation root |
+| Boot counter / verified boot state | `KeyAttestation.getVerifiedBootState()` |
+| Bootloader version | `Build.BOOTLOADER` |
+| System properties (modem firmware, baseband, fingerprint) | `Build.*` + `getprop` whitelist |
+| Installed package list + signature hashes | `PackageManager.getInstalledPackages(GET_SIGNATURES)` |
+| Granted permissions per app | `PackageManager.getPackageInfo(GET_PERMISSIONS)` |
+| Root CA store hash | enumerate + SHA-256 |
+| Device admins, accessibility services, VPN profiles | `DevicePolicyManager`, `AccessibilityManager` |
+| Settings.Secure / Settings.Global whitelist | filtered get |
+| Cell-environment baseline | last 7 days of cell observations, hashed |
+| Wi-Fi network preferences | hash |
+| App data sizes (proxy for tampered data) | `UsageStatsManager` |
+
+Diff is computed via `git diff`-style unified view, surfaced in the Threat tab post-DEFCON. Anything weird → guided incident response runbook.
+
+### Incident Response Runbook (in-app)
+
+If a critical alert fires during DEFCON, Hardened Mode walks the user through:
+
+1. Verify the alert via at least one independent signal (cross-check across heuristics).
+2. Decide between four responses, presented as buttons with clear consequences:
+   - **Acknowledge** — log + continue (low confidence alert).
+   - **Isolate** — switch to airplane mode, kill all running apps except Tetherand, surface the live signal panel.
+   - **Evacuate** — full backup to Mac, then factory reset on a defined trigger phrase.
+   - **Burn** — secure-wipe the device immediately (`DevicePolicyManager.wipeData(WIPE_RESET_PROTECTION)` with optional `WIPE_EXTERNAL_STORAGE`). Confirmation required.
+
+### Quick Wins Available Today (Pre-APK)
+
+Hardened Mode is fully realized only with the M7+ app, but the high-value subset is achievable **right now** using only:
+
+- This Mac, `adb`, the Seeker, and one shell script.
+- ~$70 of hardware (USB data blocker, Faraday pouch, RTL-SDR if you want SDR mode early).
+- Existing apps (Mullvad, Orbot, Signal).
+
+We ship a `scripts/defcon-prep.sh` that runs through everything below.
+
+The runnable checklist (script does these or prompts for them):
+
+1. **Capture attestation snapshot** — `adb shell` enumerations of installed packages + permissions + root CAs + bootloader/baseband versions + cell-env baseline, stored locally on the Mac under `attestation/pre/`.
+2. **Enable always-on VPN + lockdown** through Mullvad app (instructs user to set up Mullvad PQ multihop with a non-Vegas entry; verifies via `adb shell settings get global always_on_vpn_lockdown`).
+3. **Enable Orbot** with Snowflake bridge as a secondary chain (configure manually; script verifies the package is installed and configured).
+4. **Force LTE-only**: writes `Settings.Global` preferred-network-mode where allowed; otherwise opens the carrier-settings screen and prompts the user.
+5. **SIM PIN** prompt + verification.
+6. **Forget all saved Wi-Fi networks** (script lists them and asks; deletes with `adb shell cmd wifi forget-network`).
+7. **Disable NFC** via `adb shell svc nfc disable`.
+8. **Bluetooth off** via `adb shell svc bluetooth disable`.
+9. **Disable USB debugging in untrusted contexts**: cycle ADB authorization (clear `~/.android/adbkey` on Mac after final config, generate fresh keys, single-Mac authorize).
+10. **Permission audit** — script dumps every dangerous permission grant and surfaces the diff vs. a clean device baseline.
+11. **Install signing-key snapshot** — `adb shell pm list packages -f -i` + sha256 every APK signing cert; baseline for tamper detection.
+12. **Migrate Solana keys**: script does **not** touch the Seed Vault; it walks the user through a Seed Vault export to an offline device, then verifies the on-device vault is empty.
+13. **Battery / charge baseline** — capture `dumpsys battery` + thermal sensors snapshot.
+14. **Cell baseline drive**: script starts a 30-minute logger via `adb shell` that captures `dumpsys telephony.registry` + `getAllCellInfo` every 30 s while the user walks the conference perimeter; saves to `attestation/cell-baseline.jsonl`.
+15. **Hardware buy list**: prints recommended hardware items not yet acquired (data blocker, Faraday pouch, YubiKey 5C NFC, RTL-SDR + USB-C OTG dongle, throwaway power bank).
+16. **Operational reminders**: prints the OPSEC checklist (use cash, don't pick up USB drives, no biometric unlock, don't connect to "DEFCON-Open", keep phone in Faraday pouch when sleeping, etc.).
+17. **Post-conference re-run**: script's `--post` mode captures the post-snapshot and diffs against pre.
+
+This pre-flight script ships as **M0** — buildable and runnable today, no Kotlin involved. See updated milestones.
+
+### AI-Era Threats (first DEFCON of the LLM-mass-market era)
+
+The 2026 DEFCON is operating in a fundamentally different threat landscape than any prior year. Attackers now have:
+
+- Real-time voice synthesis good enough to impersonate trusted contacts after a few seconds of training audio (RVC, ElevenLabs, OpenVoice).
+- Real-time speech-to-text + LLM + TTS pipelines fast enough to hold a coherent two-way conversation while wearing a fake identity.
+- Personalised phishing generated from your scraped OSINT (LinkedIn, GitHub, X, scraped breach data) with a copy quality indistinguishable from a real colleague.
+- Multimodal vision models that can read your screen from a meters-away camera and generate context-aware lures in seconds.
+- Adversarial-ML inputs (poisoned QR codes, prompt-injection stickers, model-confusing visual patterns) carried by any vendor swag or badge artwork.
+- LLM-augmented social engineering during in-person chat that drafts the next reply on a hidden earpiece in under a second.
+
+Tetherand counters with on-device, model-driven defences. None of these phone home; all classifiers run locally on the Seeker's NPU.
+
+**On-device classifier stack (M10)**
+
+A small ensemble of locally-running models, bundled in-APK and updated via in-APK delta updates (delivered through the active Privacy Chain only, never out-of-band):
+
+- **`phi-tetherand-3b-q4`** — distilled Phi-3.5-mini variant fine-tuned on a corpus of phishing / social-engineering / scam messages. INT4 quantised, ~1.8 GB, runs on the Seeker's NPU via LiteRT (formerly TFLite) + GpuDelegate / NNAPI. ~120 ms per message classification.
+- **`voiceguard-v1`** — speech-synthesis-detection model. Trained on the WaveFake + ASVspoof2024 corpora. Mel-spectrogram + ConvNeXt-tiny backbone. ~40 ms per second of audio. Inputs: live mic stream + inbound call audio (via Telephony `IncallService`).
+- **`textguard-v1`** — LLM-generated-text detection. Lightweight classifier (binoculars-style) using two different LLM perplexity surfaces. Surfaces "AI-likely" badge on incoming SMS/IM. ~60 ms per message.
+- **`qrguard-v1`** — adversarial-image detector for QR codes / general visual lures. Detects perturbation patterns from `RobustBench` adversarial families. ~30 ms per image.
+
+**Defences engaged in Hardened Mode (AI-era)**
+
+- **Inbound-message AI screen.** Every incoming SMS, RCS, Signal-relay (via accessibility hook, opt-in), email-preview-notification is classified by `phi-tetherand-3b-q4` for: phishing intent, social engineering, prompt injection (in case any app feeds the message to an LLM agent the user runs), urgency-manipulation, financial-asks. Verdict shown as a banner; high-risk messages can be auto-quarantined.
+- **Voice-deepfake detection on inbound calls.** `voiceguard-v1` runs on the call audio (via `InCallService.onAudioStateChanged`). Surfaces a notification banner if the voice is likely synthetic. Includes a "voiceprint vault" of your trusted contacts — fingerprint stored locally on first authenticated call; subsequent calls cross-check.
+- **Vishing pattern detection.** Conversation-state classifier looks for known vishing scaffolds (urgency + authority + secrecy + financial-action + abnormal channel). Independent of voiceprint.
+- **LLM-generated text badge.** `textguard-v1` flags inbound text that scores as machine-generated. Not an automatic block — just an awareness signal: a tiny "AI?" badge in the notification, plus the verdict in the Threat tab feed.
+- **QR-code / image lure inspector.** A share-target intent so any QR scan or shared image first passes through `qrguard-v1`. Adversarial-perturbation pattern → red banner + URL preview behind a click-through.
+- **Prompt-injection-resistant clipboard.** Clipboard contents are scanned for known prompt-injection scaffolds ("ignore previous instructions", "system:", "[INST]", `<|im_start|>`, common jailbreak prefixes). Scaffolds get stripped or quarantined before any app reads the clipboard. (Implemented via `ClipboardManager.OnPrimaryClipChangedListener` + a one-shot transform.)
+- **Synthetic-content provenance check.** Inspect inbound images / video for C2PA manifest, SynthID watermark, or Microsoft Content Credentials. Surface "Genuine / Synthetic / Unknown provenance" badge.
+- **Real-time microphone-use awareness.** Persistent banner when mic is in use, with the using-app's name and AI-pipeline-detection (heuristic on the using-app's process behaviour — e.g. high egress + high CPU during mic capture = likely real-time STT pipeline running against the user's voice).
+- **OSINT exposure dashboard.** Pulls (through the active Privacy Chain) from `haveibeenpwned`, `intelligence-x`, public LinkedIn / GitHub for the user's accounts. Surfaces "your AI-targetable surface area" — leaks visible to a targeted attacker. Off by default; opt-in.
+- **AI-augmented social engineering field guide.** Threat tab "field guide" page with current attacker tactics: deepfake-on-call, fake-AirDrop conference-app, fake-Reddit-link clickbait, QR-poison badge stickers, etc. Updated through the chain.
+- **NPU/AI-accelerator side-channel monitoring.** Watch `/sys/devices/.../mtk_apu*` (MediaTek's NPU sysfs) for unexpected usage from non-user-foreground apps — a covert on-device model running while you sleep is a real risk. Surface in Threat tab.
+- **Adversarial-input quarantine for our own models.** If `qrguard-v1` itself reports a confidence-instability pattern (high logit variance under tiny input perturbation), the input is flagged as adversarial regardless of class verdict — protects against attacker-crafted inputs designed to fool our defences.
+- **Conference-mode contact verification.** A "verify caller" button that initiates a Signal-Voice or in-app voiceprint handshake before the conversation continues. Prevents real-time deepfake takeover of phone calls.
+- **Deepfake-resistant 2FA fallback.** Any 2FA prompt during Hardened Mode requires the YubiKey (USB-C touch). No SMS, no voice-call confirmation, no email — all of those are AI-spoofable now.
+- **Conference live threat feed.** Pull (through Privacy Chain only) curated threat intel from DEFCON's own security operations Mastodon, the Wall of Sheep team's IRC, and EFF Crocodile Hunter's community feed. Surface active campaigns as Threat tab cards.
+- **Egress LLM-API watch.** Inspect outbound TLS handshakes for SNI patterns matching `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, etc. If an app is talking to LLM APIs without the user's awareness, surface it — this catches both AI-supercharged malware *and* well-intentioned apps secretly forwarding your data to model providers.
+
+**Storage & footprint**
+
+The four-model bundle is ~2.4 GB compressed in-APK as a separate downloadable feature module (Play Asset Delivery's `install-time` policy) or sideloaded from `dist/` for direct-install distribution. INT4 quantisation keeps inference under 200 ms per event on the Seeker's NPU and well within battery budget for continuous mic + message classification.
+
+**Update path**
+
+Models update via in-APK delta updates served from our distribution URL, fetched through the active Privacy Chain, verified by signature against a pinned cosign public key shipped in the APK. No model update ever bypasses the chain. No telemetry returns to us.
+
+### Hardened Mode Threat Coverage Matrix
+
+| Threat | Mitigation in Hardened Mode |
+|---|---|
+| IMSI catcher / Stingray | LTE-only + NetMonster Tier 0 + CH heuristics + (opt) SDR mode + drive baseline |
+| Wi-Fi Pineapple / evil twin | Forget networks + Pineapple sigs + deauth detection + always-on VPN lockdown |
+| Juice jacking | Data block when locked + VID/PID allowlist + power-trace + charge-port selfie |
+| BLE / AirTag tracker | BLE scan + proximity persistence detection |
+| Hostile USB drop | Won't enumerate without VID/PID + no auto-run on Android anyway |
+| Karma / probe leakage | All saved networks forgotten + probe-request minimization |
+| App impersonation / signing | Signing-cert sha snapshot + diff |
+| Persistence: accessibility service | Service-list freeze + alert |
+| Persistence: device admin | Admin-list freeze + alert |
+| Persistence: rogue CA | Trust-store freeze + alert |
+| Persistence: rogue VPN | Single-VPN constraint (we are it) + scan for `VpnService`-capable packages |
+| Cellular cipher downgrade (A5/0) | Encryption-indicator + MTK-RIL prop poll (Tier 1) |
+| Silent SMS stalking | Silent-SMS heuristic + SDR paging-storm |
+| DNS hijack | DoH-through-chain + DNS sinkhole |
+| TLS MITM | TLS-ClientHello/SNI/cert-chain inspection at IP layer + cert pinning audit |
+| Captive portal coercion | Lockdown VPN refuses captive-portal exception |
+| Ultrasonic ad-network tracking | Listener + FFT detection |
+| RAM-disk forensics | Encrypted backup option, no plaintext at rest |
+| Evil maid (physical access while away) | Accelerometer tamper + selfie + boot-count attestation |
+| Coercion / compulsion | Decoy profile + YubiKey unlock + biometrics-off |
+| Wallet drain | Tx firewall cool-down + Seed Vault freeze + recommend off-device keys |
+| AI voice deepfake on call | `voiceguard-v1` on-device detector + voiceprint vault of trusted contacts |
+| Real-time AI-impersonation conversation | Conversation scaffold classifier + Signal-handshake verify-caller flow |
+| LLM-personalised phishing | `phi-tetherand-3b` inbound-message screen + urgency-manipulation classifier |
+| Adversarial QR / lure imagery | `qrguard-v1` perturbation detector + URL-preview gate |
+| Prompt-injection-poisoned clipboard | Clipboard scanner strips known injection scaffolds before any app reads |
+| Synthetic media (deepfake images/video) | C2PA / SynthID / Content Credentials provenance check + classifier |
+| LLM-supercharged spyware (calls home to LLM APIs) | Outbound SNI watch for `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, etc. |
+| Covert NPU use by background app | MTK NPU sysfs watcher (`/sys/devices/.../mtk_apu*`) |
+| AI-driven 2FA spoofing (voice / SMS / email) | YubiKey-only 2FA required in Hardened Mode |
+| Targeted-OSINT attacker prep | OSINT exposure dashboard surfaces your scraped surface area pre-DEFCON |
+
 ## macOS CLI / TUI / Daemon
 
 `tetherand` is a single Rust binary, ~5 MB stripped.
@@ -412,6 +685,7 @@ The userspace TCP/IP stack is forked from Gnirehtet's `relay-rust` initially. A 
 
 | | Scope | Effort | Cumulatively functional |
 |---|---|---|---|
+| **M0** DEFCON pre-flight (shippable today) | `connect.sh` (reverse-tether via upstream Gnirehtet), `backup.sh` + `restore.sh` (local encrypted full backup with `--undo`), `scripts/defcon-prep.sh` + `--post` mode (attestation snapshot, ADB-driven hardening: LTE-only, SIM-PIN prompt, NFC off, BT off, network forget, permission audit, signing-cert snapshot, cell-baseline driver, OPSEC checklist, hardware buy list, Solana Seed Vault migration walkthrough). | 4-6 h | High-value Hardened Mode subset usable **before any APK ships**, fully reversible |
 | **M1** Tether MVP | Fork + rebrand, transport abstraction, USB-ADB transport, TCP transport, Compose Tether tab, `tetherand run` CLI | 10-14 h | Replaces `connect.sh` |
 | **M2** More transports | BT RFCOMM transport, USB-AOA transport, ratatui dashboard, LaunchAgent + IOKit USB watcher | 10-14 h | All 4 transports |
 | **M3** Privacy chain core | Hop interface, WireGuard generic hop, chain orchestrator, Privacy tab with chain visualizer | 14-18 h | WG-only chains |
@@ -422,8 +696,12 @@ The userspace TCP/IP stack is forked from Gnirehtet's `relay-rust` initially. A 
 | **M7b** SDR mode (optional) | librtlsdr-android + hackrf_android dynamic-link, USB-C OTG SDR detection, `libtetherand-sdr.so` LTE control-channel decoder (srsRAN-derived), CH SDR heuristics, PCAP capture, SDR sub-tab | 12-16 h | SDR mode for users with $30 RTL-SDR |
 | **M7c** Tier 2 (root, dormant) | `/proc/ccci_md1_*` reader, `mdlog` parser, AT-command channel via `/dev/ttyMT*`, capability-gating so it's a no-op on un-rooted devices | 4-6 h | Auto-activates if user roots later |
 | **M8** Polish & release | Smoke tests, signed release APK, install scripts, README, performance tuning | 6-8 h | Shippable |
+| **M9** Hardened Mode (in-app) | DEFCON Mode toggle + Quick Settings tile, kill-switch + per-app firewall, attestation snapshot + diff UI, decoy listeners + honeytokens, BLE tracker scan UI, USB data-block + selfie traps, accelerometer tamper, wallet firewall (Solana), ultrasonic listener, TLS-pinning audit, decoy-profile + YubiKey unlock fallback, incident-response runbook | 22-30 h | Full DEFCON-grade physical / network / cellular defense in the app |
+| **M10** AI-era defenses | Bundle 4-model classifier stack (`phi-tetherand-3b-q4`, `voiceguard-v1`, `textguard-v1`, `qrguard-v1`); NPU runtime via LiteRT + NNAPI; inbound-message AI screen; voice-deepfake detection on calls; vishing scaffold classifier; LLM-text "AI?" badge; QR-image lure inspector; prompt-injection-resistant clipboard; C2PA / SynthID provenance check; mic-use awareness; OSINT exposure dashboard; NPU sysfs watcher; egress-LLM-API SNI watch; YubiKey-only 2FA in Hardened Mode; conference live threat feed | 26-34 h | Full AI-era threat coverage |
 
-**Total: ~105-145 h of focused work** (M7 expanded into a/b/c).
+**Total: ~157-215 h of focused work** (M7 expanded into a/b/c; M0, M9, and M10 added; all milestones are required scope).
+
+This is the first DEFCON since the AI capability boom went mass-market; the attacker side has scaled, automated, and personalised in ways previous years didn't see. No defences deferred, no partial coverage. M0 ships today to lock the perimeter while M1-M10 land in order. Parallelizable bands within the work: {M2 transports}, {M4, M5, M6 hops}, {M7b, M7c}, {M9 sub-defenses}, {M10 four classifiers} can all be split across worktrees once M1 + M3 + M7a are in place.
 
 Three independently shippable subsystems:
 - **Tether (M1–M2)** — works alone, ships first; this is the immediate `connect.sh` replacement.
