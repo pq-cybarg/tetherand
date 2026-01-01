@@ -48,6 +48,10 @@ class TorHop(
     private var handle: Long = 0L
     private var forwarder: TorFlowForwarder? = null
 
+    /** Port of the embedded SOCKS5 listener, or null until [start] returns. */
+    var socksPort: Int? = null
+        private set
+
     override suspend fun start(input: Channel<ByteArray>): Channel<ByteArray> {
         _state.value = HopState.Connecting
         try {
@@ -68,6 +72,11 @@ class TorHop(
                 ptStaged.conjure.orEmpty(),
             )
             if (handle == 0L) throw IllegalStateException("Arti bootstrap failed (see logcat tetherand-tor)")
+            // Spawn the embedded SOCKS5 listener so apps can route via
+            // 127.0.0.1:<port>. The per-flow TUN interceptor uses the
+            // same port; for now it's the user-facing surface.
+            val sp = nativeStartSocks(handle)
+            socksPort = if (sp > 0) sp else null
             _state.value = HopState.Connected
         } catch (t: Throwable) {
             _state.value = HopState.Error
@@ -125,6 +134,7 @@ class TorHop(
         vanguards: Boolean, preferPq: Boolean,
         ptBridgePath: String, snowflakePath: String, conjurePath: String,
     ): Long
+    private external fun nativeStartSocks(handle: Long): Int
     private external fun nativeDial(handle: Long, host: String, port: Int): Int
     private external fun nativeClose(handle: Long, streamId: Long): Int
     private external fun nativeShutdown(handle: Long)
