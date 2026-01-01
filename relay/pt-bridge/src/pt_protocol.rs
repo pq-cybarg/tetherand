@@ -74,10 +74,15 @@ pub async fn run() -> Result<(), PtError> {
     Ok(())
 }
 
-async fn listen_socks5(transport: &str) -> Result<SocketAddr, String> {
+async fn listen_socks5(transport: &str) -> Result<SocketAddr, PtError> {
+    // Reject early if the transport name isn't one we dispatch.
+    match transport {
+        "obfs4" | "meek" | "webtunnel" => {}
+        other => return Err(PtError::UnknownTransport(other.to_string())),
+    }
     let listener = TcpListener::bind("127.0.0.1:0").await
-        .map_err(|e| format!("bind: {e}"))?;
-    let addr = listener.local_addr().map_err(|e| format!("local_addr: {e}"))?;
+        .map_err(|e| PtError::Listener(format!("bind: {e}")))?;
+    let addr = listener.local_addr().map_err(|e| PtError::Listener(format!("local_addr: {e}")))?;
     let transport = transport.to_string();
     tokio::spawn(async move { socks5_loop(listener, transport).await });
     Ok(addr)

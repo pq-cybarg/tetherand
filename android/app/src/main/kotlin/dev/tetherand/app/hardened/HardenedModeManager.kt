@@ -3,6 +3,7 @@ package dev.tetherand.app.hardened
 import android.content.Context
 import android.content.Intent
 import dev.tetherand.app.aiguard.clipboard.ClipboardScrubberService
+import dev.tetherand.app.hardened.deadman.DeadmansSwitch
 import dev.tetherand.app.hardened.decoy.DecoyListenerService
 import dev.tetherand.app.hardened.tamper.TamperWatcher
 import dev.tetherand.app.threat.collector.AppAudit
@@ -19,6 +20,7 @@ data class HardenedDefense(val id: String, val displayName: String, val state: S
 class HardenedModeManager(private val ctx: Context) {
     private val store = HardenedModeStore(ctx)
     private val tamper = TamperWatcher(ctx)
+    val deadman = DeadmansSwitch(ctx)
     private val _state = MutableStateFlow(store.active)
     val active: StateFlow<Boolean> = _state.asStateFlow()
 
@@ -45,6 +47,8 @@ class HardenedModeManager(private val ctx: Context) {
         ctx.startForegroundService(Intent(ctx, ClipboardScrubberService::class.java))
         // 4. Arm the tamper watcher.
         tamper.start()
+        // 4b. Start the dead-man's switch (no-op if disabled in its config).
+        deadman.start()
         // 5. Persist + emit state.
         store.active = true
         _state.value = true
@@ -59,6 +63,7 @@ class HardenedModeManager(private val ctx: Context) {
         ctx.startService(Intent(ctx, ClipboardScrubberService::class.java)
             .setAction(ClipboardScrubberService.ACTION_STOP))
         tamper.stop()
+        deadman.stop()
         store.active = false
         _state.value = false
     }
