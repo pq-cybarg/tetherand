@@ -43,3 +43,29 @@ codegen-units = 1
 # every Android-bound artifact clean of build-host PII.
 strip = true
 debug = false
+
+# ---------------------------------------------------------------------
+# Local fix for the nym-sdk dep-graph collision.
+#
+# nym-sdk 1.21 transitively pulls `blake3 1.8`, which moved to
+# `digest 0.11`. The rest of nym-crypto still uses `hmac` (built on
+# `digest 0.10`). The resulting trait incoherence (`Digest` from 0.11
+# vs 0.10) breaks the build of `nym-sphinx-anonymous-replies` with
+# 5x E0277 / E0599 errors.
+#
+# Workaround: pin blake3 to the latest version that still uses
+# digest 0.10 (the 1.5.x line). Cargo's [patch.crates-io] mechanism
+# replaces every transitive use of blake3 across the workspace with
+# this pinned version; no upstream code change required, no vendoring,
+# no fork maintenance burden.
+#
+# When upstream nym-sdk coordinates a unified digest version (0.10
+# everywhere or 0.11 everywhere), drop this override.
+# ---------------------------------------------------------------------
+# NOTE: an earlier draft pinned blake3 = "=1.5.4" via [patch.crates-io]
+# to dodge the nym-sdk 1.21 trait-incoherence (blake3 1.8 → digest 0.11
+# vs hmac → digest 0.10). Cargo refused because semver-compatibility:
+# nym-crypto requires blake3 >= 1.8, and 1.5.4 doesn't satisfy that.
+# The working fix lives at the dependency-version level inside the
+# nym crate (try a nym-sdk version pinned BEFORE the blake3-1.8
+# upgrade) — see relay/nym/Cargo.toml.

@@ -105,6 +105,41 @@ pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeClose(
     _stream_id: jlong,
 ) -> jint { 0 }
 
+/// Read up to `buf.size` bytes from the arti DataStream identified by
+/// `stream_id`. Returns:
+///   - bytes-read (positive) on success
+///   - `-2` for "no data right now" — caller backs off briefly
+///   - `-1` for EOF or any other error
+///
+/// **v0.1 ships the JNI surface** so the Kotlin TorFlowForwarder TCP
+/// state machine wires cleanly. The actual arti DataStream read /
+/// write path lives in `crate::client::stream_read` which v0.1 stubs
+/// as "always EOF" — the full TCP-over-Tor data path ships in M6.x
+/// once the arti `DataStream::read` async surface is wired through
+/// the tokio runtime owned by `TorRuntime`. The state-machine code
+/// above handles EOF gracefully (sends FIN-ACK to the device).
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeStreamRead(
+    _env: JNIEnv,
+    _cls: JClass,
+    _handle: jlong,
+    _stream_id: jlong,
+    _buf: jni::objects::JByteArray,
+) -> jint { -1 }
+
+/// Write `bytes` to the arti DataStream. Returns bytes-written
+/// (always == bytes.len() on the stub), or `-1` on error.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeStreamWrite(
+    env: JNIEnv,
+    _cls: JClass,
+    _handle: jlong,
+    _stream_id: jlong,
+    bytes: jni::objects::JByteArray,
+) -> jint {
+    env.get_array_length(&bytes).unwrap_or(-1)
+}
+
 /// Drop the runtime + tokio + arti client.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeShutdown(

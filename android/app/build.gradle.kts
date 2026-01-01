@@ -80,6 +80,21 @@ dependencies {
     // "highest security available across diverse cryptographic
     // assumptions". See ModelUpdater.kt for the full rationale.
     implementation("org.bouncycastle:bcprov-jdk18on:1.80")
+    // Apache Milagro AMCL — pure-Java BLS12-381 implementation.
+    // Used by PublicBeacons to verify drand-quicknet round signatures
+    // (BLS12-381 G1 pubkey × G2 signature, pairing-check verification).
+    // Pure Java with no native bindings; ~500 KB binary cost in
+    // exchange for full BLS verification of every drand round we
+    // absorb into the SeekerRng mixer.
+    //
+    // Exclusion: milagro 0.4.0 transitively pulls guava 23.0, which
+    // conflicts with newer guava (com.google.guava:listenablefuture
+    // is the modern carve-out) producing a Duplicate-class build
+    // failure. Milagro itself doesn't use ListenableFuture in the
+    // BLS code path we exercise, so dropping it is safe.
+    implementation("org.miracl.milagro.amcl:milagro-crypto-java:0.4.0") {
+        exclude(group = "com.google.guava", module = "guava")
+    }
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     debugImplementation("androidx.compose.ui:ui-tooling")

@@ -96,6 +96,14 @@ class TorHop(
         val fwd = TorFlowForwarder(
             dialer = { host, port -> nativeDial(h, host, port).toLong() },
             dialClose = { sid -> try { nativeClose(h, sid) } catch (_: Throwable) {} },
+            streamRead = { sid, buf ->
+                try { nativeStreamRead(h, sid, buf) }
+                catch (_: Throwable) { -1 }
+            },
+            streamWrite = { sid, bytes ->
+                try { nativeStreamWrite(h, sid, bytes) }
+                catch (_: Throwable) { -1 }
+            },
         )
         fwd.start(input, output)
         forwarder = fwd
@@ -145,5 +153,12 @@ class TorHop(
     private external fun nativeStartSocks(handle: Long): Int
     private external fun nativeDial(handle: Long, host: String, port: Int): Int
     private external fun nativeClose(handle: Long, streamId: Long): Int
+    /** Read up to `buf.size` bytes from the arti DataStream identified
+     *  by `streamId`. Returns bytes-read, or `-2` for "no data right now"
+     *  (caller backs off briefly), or `-1` for EOF / error. */
+    private external fun nativeStreamRead(handle: Long, streamId: Long, buf: ByteArray): Int
+    /** Write `bytes` into the arti DataStream. Returns bytes-written,
+     *  or `-1` on error. */
+    private external fun nativeStreamWrite(handle: Long, streamId: Long, bytes: ByteArray): Int
     private external fun nativeShutdown(handle: Long)
 }

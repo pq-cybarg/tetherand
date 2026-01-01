@@ -15,12 +15,38 @@ crate-type = ["cdylib", "rlib"]
 # `vpn` feature off because that requires the Linux/macOS Wireguard
 # kernel module which doesn't apply on Android (we already have our
 # own WG hop via M4).
-# Nym SDK is gated behind `with-sdk` because nym-sdk 1.4's transitive
-# nym-noise 1.20.4 currently fails to type-infer under rustc 1.83+
-# (a closure parameter the upstream forgot to annotate). The Tetherand
-# JNI surface compiles standalone without it; build-nym-android.sh
-# pins a working nightly + flips this feature on at cross-compile time.
-nym-sdk = { version = "1.4", default-features = false, optional = true }
+# Nym SDK is gated behind `with-sdk`. Investigation log (2026-05-31):
+#
+# - **nym-sdk 1.4** failed to type-infer under rustc 1.85: the older
+#   `nym-noise` crate had an under-annotated closure that newer
+#   rustc inference rejects.
+# - **nym-sdk 1.21** (latest as of 2026-05-31) compiles past the
+#   nym-noise issue but trips a different upstream blocker: the
+#   transitive `blake3 1.8.5` adopted `digest 0.11`, while
+#   `hmac` (used pervasively in nym-crypto + nym-sphinx-anonymous-
+#   replies) still uses `digest 0.10`. The trait-incoherence
+#   between `Digest<0.10>` and `Digest<0.11>` produces 5x E0277 /
+#   E0599 errors at compile time. `[patch.crates-io]` cannot dodge
+#   this because the 0.10 / 0.11 split is semver-incompatible —
+#   any patch satisfying nym-crypto's `blake3 >= 1.8` also pulls
+#   `digest 0.11`, and a patch pinning blake3 < 1.8 fails Cargo's
+#   semver check.
+#
+# Local fix options remaining (multi-day, not single-session):
+#   (A) Vendor + patch `nym-sphinx-anonymous-replies` (the failing
+#       call site) to use `digest 0.11` directly. Carries forward
+#       through every upstream patch release as maintenance burden.
+#   (B) Fork `nym-crypto` and ship a `digest 0.10`-only blake3 path.
+#       Larger surface to maintain.
+#   (C) Wait for upstream coordination on unified digest version.
+#
+# v0.1 ships path (C); the JNI surface in client.rs + jni.rs compiles
+# standalone (returning "not-ready" status) so the chain orchestrator
+# wires cleanly. The NymVpnHop activates when upstream unifies the
+# digest version OR when path (A)/(B) is staffed. Documentation
+# captures this so a future contributor doesn't repeat the
+# investigation.
+nym-sdk = { version = "1.21", default-features = false, optional = true }
 
 tokio = { version = "1.43", features = ["rt-multi-thread", "macros", "net", "sync", "io-util"] }
 log = "0.4"

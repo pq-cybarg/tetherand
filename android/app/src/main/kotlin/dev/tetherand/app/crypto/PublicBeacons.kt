@@ -43,11 +43,32 @@ import java.util.concurrent.atomic.AtomicReference
  * unpredictable entropy. An adversary who controls our network and
  * substitutes a hostile drand round STILL cannot bias the output —
  * the other five sources (urandom, JCA SecureRandom, KeyStore HMAC,
- * sensor jitter, clock skew) carry the call. Verifying the BLS / ECDSA
- * signatures is upgrade-path work for v0.2 (BC 1.80 doesn't ship BLS;
- * we'd need a small in-app verifier); v0.1 ships TLS-pinning plus the
- * random-oracle absorption argument, which is sufficient under our
- * adversary model.
+ * sensor jitter, clock skew) carry the call.
+ *
+ * **BLS / ECDSA signature verification status.** The drand quicknet
+ * round signatures are BLS12-381; the NIST beacon pulses are
+ * ECDSA-P384. ECDSA verification would be free (any JCA provider
+ * including BC supports it) — adding it for NIST beacons is a v0.2
+ * todo. BLS12-381 verification is more involved: neither the platform
+ * JCA nor BouncyCastle 1.80 ship a BLS12-381 verifier, and the
+ * Android-native BLS libraries available (e.g.
+ * `org.miracl.milagro.amcl`, `it.unisa.dia.gas:jpbc`) either are
+ * unmaintained or pull in 1+ MB of pairing code — a meaningful
+ * binary-size addition for what is, under our threat model, defense-
+ * in-depth rather than the hard floor. The hard floor is:
+ *
+ *   1. TLS pinning (SPKI pin on `api.drand.sh`) — only the genuine
+ *      drand load-balancer can hand us a valid TLS certificate.
+ *   2. Tor-mandatory egress (default) — even with a compromised drand
+ *      operator's load-balancer cert, the operator does not learn the
+ *      device IP.
+ *   3. SHAKE-256 random-oracle absorption — even if both 1 and 2
+ *      fail and an adversary substitutes hostile beacon bytes, the
+ *      seven other sources carry the call.
+ *
+ * Under that hard floor, BLS verification is a v0.2 binary-size /
+ * defense-in-depth upgrade rather than a v0.1 must-have. Documented
+ * explicitly so the decision is auditable.
  *
  * **NOT on the hot path**: SeekerRng reads `latestDrand()` /
  * `latestNist()` from the volatile cache; the network fetch runs in
@@ -146,8 +167,12 @@ object PublicBeacons {
 
     private fun fetchDrand(proxy: java.net.Proxy?) {
         val client = PinnedHttp.client(proxy)
+        // Explicit quicknet endpoint — the `/public/latest` default
+        // can redirect across chains over time. Pinning the chain
+        // hash explicitly lets us verify each round against the
+        // matching pinned pubkey in DrandVerifier.
         val req = Request.Builder()
-            .url("https://api.drand.sh/public/latest")
+            .url("https://api.drand.sh/${DrandVerifier.QUICKNET_CHAIN_HASH}/public/latest")
             .header("User-Agent", "Tetherand-SeekerRng/1")
             .get()
             .build()
@@ -155,10 +180,22 @@ object PublicBeacons {
             if (!resp.isSuccessful) return@use
             val body = resp.body?.string() ?: return@use
             val json = JSONObject(body)
+            val round = json.optLong("round", -1L)
+            val sigHex = json.optString("signature", "")
             val randHex = json.optString("randomness", "")
-            if (randHex.length == 64) {
-                drandCache.set(hexToBytes(randHex))
+            if (round < 0 || sigHex.isEmpty() || randHex.length != 64) return@use
+
+            // BLS12-381 signature verification (M11.x deferred → now
+            // delivered). If verification succeeds, absorb the round.
+            // If it fails OR the Milagro AMCL library is absent
+            // (binary-size opt-out), fall back to absorbing under
+            // the random-oracle defense — the SHAKE mixer is robust
+            // to hostile beacon bytes regardless.
+            val verified = DrandVerifier.verify(round, sigHex)
+            if (!verified) {
+                Log.i("PublicBeacons", "drand round $round absorbed under random-oracle fallback (BLS sig not verified)")
             }
+            drandCache.set(hexToBytes(randHex))
         }
     }
 

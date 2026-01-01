@@ -240,8 +240,21 @@ class ModelUpdater(private val ctx: Context) {
         verifyMlDsa87(bodyBytes, sigMldsa)
         verifySlhDsa256s(bodyBytes, sigSlhdsa)
 
-        outer.optString("mtc_proof", "").takeIf { it.isNotEmpty() }?.let {
-            Log.i(TAG, "manifest carries MTC proof (${it.length} chars); log-walk verifier ships in M10.x")
+        // MTC log-walk verifier (M10.x). The wrapper carries a
+        // Sigsum-style inclusion proof of the manifest body's
+        // SHA-256 in a pinned transparency log. v0.1 is
+        // default-allow-on-empty: a manifest WITHOUT a proof is
+        // accepted (forward-compat scaffolding); a manifest WITH a
+        // proof must verify against a pinned log pubkey AND walk to
+        // the claimed root. Once the project Sigsum log is in
+        // production, this default flips to require-proof.
+        val mtcProof = outer.optString("mtc_proof", "")
+        val bodyShaHex = sha256Hex(bodyBytes)
+        if (!dev.tetherand.app.crypto.MtcVerifier.verify(mtcProof, bodyShaHex)) {
+            throw IllegalStateException("manifest MTC inclusion proof does not verify against any pinned Sigsum log")
+        }
+        if (mtcProof.isNotEmpty()) {
+            Log.i(TAG, "manifest MTC inclusion proof verified against pinned log")
         }
 
         return JSONObject(String(bodyBytes, Charsets.UTF_8))
