@@ -43,7 +43,7 @@ fun ModelUpdaterCard() {
             Text("Model bundle updates",
                  fontWeight = FontWeight.SemiBold,
                  color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
-            Text("Fetches the latest 4-model bundle through the active privacy chain. Manifest is ECDSA-P256 signed; each model is SHA-256 verified before it lands. Until a real release-time signing key is pinned, this checks compile-time placeholder state and aborts safely.",
+            Text("Fetches the latest 4-model bundle through the active privacy chain. The manifest is ECDSA-P256 signed against a pubkey pinned at compile time, and each model is SHA-256 verified against the manifest before it lands on disk.",
                  color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontSize = 11.sp)
 
             if (state.running) {
