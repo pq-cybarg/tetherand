@@ -1,0 +1,32 @@
+[workspace]
+resolver = "3"
+members = [
+    "codec",
+    "transport-api",
+    "transport-adb",
+    "transport-tcp",
+    "cli",
+]
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0"
+authors = ["pq-cybarg <resistant@tuta.com>"]
+rust-version = "1.85"
+
+[workspace.dependencies]
+tokio = { version = "1.43", features = ["rt-multi-thread", "net", "io-util", "macros", "sync", "signal", "time"] }
+clap = { version = "4.5", features = ["derive", "env"] }
+thiserror = "2.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-trait = "0.1"
+bytes = "1.9"
+byteorder = "1.5"
+mdns-sd = "0.13"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

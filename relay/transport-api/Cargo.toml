@@ -1,0 +1,14 @@
+[package]
+name = "tetherand-transport-api"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tetherand-codec = { path = "../codec" }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+bytes = { workspace = true }
