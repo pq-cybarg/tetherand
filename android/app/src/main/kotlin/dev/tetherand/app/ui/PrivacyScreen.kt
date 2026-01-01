@@ -15,14 +15,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +51,22 @@ fun PrivacyScreen(onStart: (String, Boolean) -> Unit, onStop: () -> Unit) {
     var picked by remember { mutableStateOf<dev.tetherand.app.mullvad.MullvadWgServer?>(null) }
     var pqEnabled by remember { mutableStateOf(true) }
     var mullvadError by remember { mutableStateOf<String?>(null) }
+    // M4d multihop
+    var multihop by remember { mutableStateOf(false) }
+    var exitServer by remember { mutableStateOf<dev.tetherand.app.mullvad.MullvadWgServer?>(null) }
+    // M4e DAITA
+    var daita by remember { mutableStateOf(false) }
+    // M4f obfuscation
+    var obfsMode by remember { mutableStateOf(dev.tetherand.app.mullvad.ObfuscationMode.Plain) }
+    var bridgeHost by remember { mutableStateOf("") }
+    var bridgePort by remember { mutableStateOf("") }
+    var bridgeCipher by remember { mutableStateOf("chacha20-ietf-poly1305") }
+    var bridgePassword by remember { mutableStateOf("") }
+    // M4g split-tunnel
+    val ctx = LocalContext.current
+    val splitStore = remember { dev.tetherand.app.splittunnel.SplitTunnelStore(ctx) }
+    var disallowed by remember { mutableStateOf(splitStore.disallowed()) }
+    var showAppPicker by remember { mutableStateOf(false) }
     val scroll = rememberScrollState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -147,24 +167,115 @@ fun PrivacyScreen(onStart: (String, Boolean) -> Unit, onStop: () -> Unit) {
                         }
                     }
                 }
+                // M4d multihop: switch + exit server picker.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = multihop, onCheckedChange = { multihop = it })
+                    Spacer(Modifier.padding(end = 8.dp))
+                    Text("Multihop (separate entry + exit server)", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                }
+                if (multihop && servers.isNotEmpty()) {
+                    Text("Exit server:", color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                    Column(Modifier.fillMaxWidth().height(140.dp).verticalScroll(rememberScrollState())) {
+                        for (s in servers) {
+                            Text(
+                                s.display,
+                                color = if (s == exitServer) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                modifier = Modifier.fillMaxWidth().clickable { exitServer = s }.padding(vertical = 4.dp),
+                            )
+                        }
+                    }
+                }
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = pqEnabled, onCheckedChange = { pqEnabled = it })
                     Spacer(Modifier.padding(end = 8.dp))
                     Text("Post-quantum tunnel (ML-KEM-1024)", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
                 }
+
+                // M4e DAITA toggle.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = daita, onCheckedChange = { daita = it })
+                    Spacer(Modifier.padding(end = 8.dp))
+                    Text("DAITA — traffic shaping vs. ML fingerprinting", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                }
+
+                // M4f obfuscation transport picker.
+                Text("Obfuscation transport", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (m in dev.tetherand.app.mullvad.ObfuscationMode.values()) {
+                        AssistChip(
+                            onClick = { obfsMode = m },
+                            label = { Text(m.displayName, fontSize = 10.sp) },
+                            modifier = if (obfsMode == m) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)) else Modifier,
+                        )
+                    }
+                }
+                if (obfsMode != dev.tetherand.app.mullvad.ObfuscationMode.Plain) {
+                    OutlinedTextField(
+                        value = bridgeHost, onValueChange = { bridgeHost = it },
+                        label = { Text("Bridge host") },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                    )
+                    OutlinedTextField(
+                        value = bridgePort,
+                        onValueChange = { bridgePort = it.filter { c -> c.isDigit() }.take(5) },
+                        label = { Text("Bridge port") },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                    )
+                    if (obfsMode == dev.tetherand.app.mullvad.ObfuscationMode.Shadowsocks) {
+                        OutlinedTextField(
+                            value = bridgeCipher, onValueChange = { bridgeCipher = it },
+                            label = { Text("SS cipher (e.g. chacha20-ietf-poly1305)") },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true,
+                            textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                        )
+                        OutlinedTextField(
+                            value = bridgePassword, onValueChange = { bridgePassword = it },
+                            label = { Text("SS password") },
+                            modifier = Modifier.fillMaxWidth(), singleLine = true,
+                            textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                        )
+                    }
+                }
+
+                // M4g split-tunnel app picker entry point.
+                Button(onClick = { showAppPicker = true }) {
+                    Text("Exclude apps from VPN (${disallowed.size} selected)")
+                }
+
                 Button(
                     onClick = {
                         scope.launch {
                             try {
                                 val server = picked ?: return@launch
                                 val api = dev.tetherand.app.mullvad.MullvadApi()
-                                val (cfg, _) = dev.tetherand.app.mullvad.MullvadConfigBuilder.build(api, account, server)
+                                val (rawCfg, _) = if (multihop && exitServer != null)
+                                    dev.tetherand.app.mullvad.MullvadConfigBuilder.buildMultihop(api, account, server, exitServer!!)
+                                else
+                                    dev.tetherand.app.mullvad.MullvadConfigBuilder.build(api, account, server)
+                                val cfg = rawCfg.copy(
+                                    obfuscation = obfsMode,
+                                    obfuscationBridge = if (obfsMode != dev.tetherand.app.mullvad.ObfuscationMode.Plain
+                                            && bridgeHost.isNotEmpty() && bridgePort.isNotEmpty()) {
+                                        dev.tetherand.app.mullvad.ObfuscationBridge(
+                                            host = bridgeHost,
+                                            port = bridgePort.toInt(),
+                                            cipher = bridgeCipher.takeIf { obfsMode == dev.tetherand.app.mullvad.ObfuscationMode.Shadowsocks },
+                                            password = bridgePassword.takeIf { obfsMode == dev.tetherand.app.mullvad.ObfuscationMode.Shadowsocks },
+                                        )
+                                    } else null,
+                                    daita = daita,
+                                )
                                 wgText = configToText(cfg)
                                 mullvadError = null
                             } catch (t: Throwable) { mullvadError = t.message }
                         }
                     },
-                    enabled = picked != null && account.length == 16,
+                    enabled = picked != null && account.length == 16 && (!multihop || exitServer != null),
                 ) { Text("Build config from Mullvad") }
                 if (mullvadError != null) {
                     Text(mullvadError!!, color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
@@ -198,6 +309,37 @@ fun PrivacyScreen(onStart: (String, Boolean) -> Unit, onStop: () -> Unit) {
         } else {
             Button(onClick = { running = false; onStop() }) { Text("Stop chain") }
         }
+    }
+
+    // M4g split-tunnel app picker dialog.
+    if (showAppPicker) {
+        val apps = remember { dev.tetherand.app.splittunnel.InstalledApps.list(ctx) }
+        AlertDialog(
+            onDismissRequest = { showAppPicker = false },
+            confirmButton = {
+                Button(onClick = {
+                    splitStore.setDisallowed(disallowed)
+                    showAppPicker = false
+                }) { Text("Save") }
+            },
+            dismissButton = { Button(onClick = { showAppPicker = false }) { Text("Cancel") } },
+            title = { Text("Exclude apps from VPN") },
+            text = {
+                Column(Modifier.height(400.dp).verticalScroll(rememberScrollState())) {
+                    for (app in apps) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = app.pkg in disallowed,
+                                onCheckedChange = { checked ->
+                                    disallowed = if (checked) disallowed + app.pkg else disallowed - app.pkg
+                                },
+                            )
+                            Text(app.label, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))
+                        }
+                    }
+                }
+            },
+        )
     }
 }
 
