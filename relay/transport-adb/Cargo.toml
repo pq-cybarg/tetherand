@@ -1,0 +1,16 @@
+[package]
+name = "tetherand-transport-adb"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "USB-ADB transport for Tetherand. Frame-encoded byte stream over `adb forward`. Built but unused by M1's CLI (which delegates directly to the relay-core); M2+ wires this in for transport-multiplexing."
+
+[dependencies]
+tetherand-transport-api = { path = "../transport-api" }
+tetherand-codec = { path = "../codec" }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+bytes = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }

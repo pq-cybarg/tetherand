@@ -1,0 +1,17 @@
+[package]
+name = "tetherand-transport-tcp"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "TCP/LAN transport with mDNS discovery for Tetherand. Built but unused by M1's CLI (which uses relay-core directly); M2+ wires this in for transport-multiplexing alongside Bluetooth/AOA."
+
+[dependencies]
+tetherand-transport-api = { path = "../transport-api" }
+tetherand-codec = { path = "../codec" }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+bytes = { workspace = true }
+mdns-sd = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }

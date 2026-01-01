@@ -96,31 +96,52 @@ fn adb_uninstall(device: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-fn adb_forward(device: Option<&str>, port: u16) -> Result<()> {
-    let tcp = format!("tcp:{port}");
+/// `adb reverse localabstract:tetherand tcp:<port>` — on the device side
+/// adbd binds the abstract socket `tetherand`; when the device's
+/// VpnService connects to it (via `LocalSocket("tetherand")`), adb routes
+/// the connection back to the host's TCP port where our relay is listening.
+///
+/// This is the inverse of `adb forward`. Gnirehtet upstream uses the same
+/// direction.
+fn adb_reverse(device: Option<&str>, port: u16) -> Result<()> {
     let abs = "localabstract:tetherand".to_string();
-    let out = run_adb(device, &["forward", &tcp, &abs])?;
-    if !out.status.success() {
-        anyhow::bail!("adb forward failed: {}", String::from_utf8_lossy(&out.stderr));
-    }
-    info!("adb forward tcp:{port} -> localabstract:tetherand");
-    Ok(())
-}
-
-fn adb_remove_forward(device: Option<&str>, port: u16) -> Result<()> {
     let tcp = format!("tcp:{port}");
-    let _ = run_adb(device, &["forward", "--remove", &tcp])?;
+    let out = run_adb(device, &["reverse", &abs, &tcp])?;
+    if !out.status.success() {
+        anyhow::bail!("adb reverse failed: {}", String::from_utf8_lossy(&out.stderr));
+    }
+    info!("adb reverse localabstract:tetherand -> tcp:{port}");
     Ok(())
 }
 
+fn adb_remove_reverse(device: Option<&str>) -> Result<()> {
+    let abs = "localabstract:tetherand".to_string();
+    let _ = run_adb(device, &["reverse", "--remove", &abs])?;
+    Ok(())
+}
+
+/// Fire the invisible Activity's START intent. The Activity itself
+/// (`TetherandActivity`) checks `VpnService.prepare()`, then starts the
+/// foreground service. Mirrors how upstream Gnirehtet launches.
 fn adb_start_service(device: Option<&str>) -> Result<()> {
     let out = run_adb(device, &[
-        "shell", "am", "start-foreground-service",
-        "-n", &format!("{PACKAGE_NAME}/.service.TetherandVpnService"),
+        "shell", "am", "start",
+        "-a", "dev.tetherand.app.START",
+        "-n", &format!("{PACKAGE_NAME}/.TetherandActivity"),
     ])?;
     if !out.status.success() {
         tracing::warn!("could not auto-start service: {}", String::from_utf8_lossy(&out.stderr));
     }
+    Ok(())
+}
+
+/// Tell the invisible Activity to stop the VPN.
+fn adb_stop_service(device: Option<&str>) -> Result<()> {
+    let _ = run_adb(device, &[
+        "shell", "am", "start",
+        "-a", "dev.tetherand.app.STOP",
+        "-n", &format!("{PACKAGE_NAME}/.TetherandActivity"),
+    ])?;
     Ok(())
 }
 
@@ -129,7 +150,7 @@ fn cmd_run(device: Option<String>, transport: TransportChoice, port: u16) -> Res
 
     let port = match transport {
         TransportChoice::Adb => {
-            adb_forward(device.as_deref(), port)?;
+            adb_reverse(device.as_deref(), port)?;
             port
         }
         TransportChoice::Tcp => {
@@ -158,7 +179,9 @@ fn ctrlc_handler(device: Option<String>, port: u16) -> Result<()> {
         .context("installing SIGINT handler")?;
     let _ = rx.recv();
     info!("Ctrl+C received, tearing down");
-    let _ = adb_remove_forward(device.as_deref(), port);
+    let _ = adb_stop_service(device.as_deref());
+    let _ = adb_remove_reverse(device.as_deref());
+    let _ = port; // unused in reverse mode
     std::process::exit(0);
 }
 
