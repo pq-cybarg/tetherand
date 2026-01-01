@@ -1,5 +1,6 @@
 package dev.tetherand.app.threat.heuristic
 
+import android.content.Context
 import dev.tetherand.app.threat.model.Alert
 import dev.tetherand.app.threat.model.Heuristic
 import dev.tetherand.app.threat.model.Severity
@@ -32,7 +33,8 @@ object AdbdNetworkSurface {
 
     private const val ADB_DEFAULT_PORT = 5555
 
-    fun evaluate(): Alert? {
+    fun evaluate(ctx: Context): Alert? {
+        if (ThreatSuppressions(ctx).isSuppressed(ThreatSuppressions.KEY_ADBD_NETWORK)) return null
         val tcpPortProp = systemProp("service.adb.tcp.port")?.toIntOrNull() ?: 0
         val listening = scanListenPorts()
         val adbPortsListening = listening.filter {
@@ -41,6 +43,11 @@ object AdbdNetworkSurface {
         // Two ways this fires:
         //   1. The toggle is explicitly on (service.adb.tcp.port > 0).
         //   2. A socket is actually listening on the ADB-default port.
+        // Plain USB ADB does NOT trip either branch (the USB transport
+        // doesn't open a TCP listener and the property stays at 0/-1),
+        // so `adb reverse` from `tetherand run` is invisible here. A
+        // developer who deliberately enabled `adb tcpip` for their
+        // own debug workflow can suppress via Threat tab once.
         if (tcpPortProp <= 0 && adbPortsListening.isEmpty()) return null
 
         val ev = JSONObject().apply {

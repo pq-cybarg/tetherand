@@ -121,8 +121,8 @@ class ThreatDetectionService : Service() {
         // alert until the user takes action.
         scope.launch {
             while (isActive) {
-                dev.tetherand.app.threat.heuristic.PatchLevelStaleness.evaluate()?.let { fire(it) }
-                dev.tetherand.app.threat.heuristic.AdbdNetworkSurface.evaluate()?.let { fire(it) }
+                dev.tetherand.app.threat.heuristic.PatchLevelStaleness.evaluate(applicationContext)?.let { fire(it) }
+                dev.tetherand.app.threat.heuristic.AdbdNetworkSurface.evaluate(applicationContext)?.let { fire(it) }
                 delay(6L * 3600 * 1000)
             }
         }
