@@ -96,6 +96,10 @@ reverse-tethering/
 │   │   └── src/main/kotlin/dev/tetherand/transports/{adb,aoa,bt,tcp}/
 │   ├── threat/                       # Threat detection engine
 │   │   └── src/main/kotlin/dev/tetherand/threat/
+│   │       ├── collector/{netmonster,telephony,wifi,bt,app,adbtier,mtktier2}/
+│   │       ├── heuristic/{aimsicd,snoopsnitch,crocodile,ours}/
+│   │       ├── tower/                # OpenCellID Room DB + EARFCN allocations
+│   │       └── sdr/                  # JNI to libtetherand-sdr.so (rtl-sdr / hackrf)
 │   └── native/                       # Rust → JNI shared codec + WG hooks
 ├── relay/                            # Cargo workspace (Mac side)
 │   ├── core/                         # Userspace TCP/IP (forked Gnirehtet relay-rust)
@@ -218,14 +222,74 @@ Chain failure modes are user-configurable per chain: `block` (kill-switch, no tr
 
 ### Prior Art
 
-This subsystem builds on two existing GPL-3 projects whose code we can port directly:
+This subsystem builds on four existing GPL-3 projects whose code we can port directly:
 
-- **AIMSICD** (Android IMSI-Catcher Detector) — github.com/CellularPrivacy/Android-IMSI-Catcher-Detector. Mostly inactive since ~2017 but the canonical reference for non-root, TelephonyManager-based IMSI-catcher detection. Heuristics we port: `BTSAlgorithm` (cell-tower consistency vs. OpenCellID), LAC/CID consistency, neighbor-cell consistency, femtocell pattern, encryption-status capture where carriers expose it, silent-SMS heuristic (binary SMS arrival to phantom port). License compatible with ours (both GPL-3).
-- **SnoopSnitch** — opensource.srlabs.de/projects/snoopsnitch. The Qualcomm `/dev/diag` path does not apply to the Seeker (MediaTek), but we port: silent-paging analysis, cell-tower fingerprinting database design, RAT-downgrade severity scoring, encryption-indicator algorithm (A5/0 etc. when exposed via `cell_info` or `service_state` extras). License compatible (GPL-3).
+- **AIMSICD** (Android IMSI-Catcher Detector) — github.com/CellularPrivacy/Android-IMSI-Catcher-Detector. Mostly inactive since ~2017 but the canonical reference for non-root, TelephonyManager-based IMSI-catcher detection. Heuristics we port: `BTSAlgorithm` (cell-tower consistency vs. OpenCellID), LAC/CID consistency, neighbor-cell consistency, femtocell pattern, encryption-status capture where carriers expose it, silent-SMS heuristic (binary SMS arrival to phantom port).
+- **SnoopSnitch** — opensource.srlabs.de/projects/snoopsnitch. The Qualcomm `/dev/diag` path does not apply to the Seeker (MediaTek), but we port the higher-level subset: silent-paging analysis, cell-tower fingerprinting design, RAT-downgrade severity scoring, encryption-indicator algorithm (A5/0 etc. when exposed via `cell_info` or `service_state` extras). The Qualcomm-diag pathway is preserved in the codebase but gated to `Build.HARDWARE` matching Qualcomm SoCs — it will not activate on the Seeker but the architecture is portable to Qualcomm phones (your next device, a passenger's Pixel, etc.).
+- **NetMonster-core** — github.com/mroczis/netmonster-core. Actively maintained (2024+), GPL-3, and crucially **MediaTek-aware**: uses reflection against MTK-specific framework classes to surface neighbor cells, secondary serving cells, EARFCN/PCI/TAC/eNB-ID/RSRP-Q, NR-side-info, carrier-aggregation state, and the "subsidiary" fields that `TelephonyManager.getAllCellInfo()` silently drops on MediaTek. This is the bridge that gives us baseband-grade visibility on the Seeker without root.
+- **Crocodile Hunter** (EFF) — github.com/EFForg/crocodilehunter. Phone-side data collector (Java) plus server-side ML analysis (Python) plus optional SDR (Airspy/RTL-SDR) capture. We port the phone-side collector and *all* heuristics that don't require an SDR; we also support **optional RTL-SDR-via-USB-C-OTG mode** for the full pipeline (see "Crocodile Hunter Integration" below).
 
-The Threat Detection runtime is therefore: **AIMSICD's TelephonyManager heuristics, modernised for Android 16 (`TelephonyCallback`, R+ APIs, scoped storage), augmented with SnoopSnitch's higher-level heuristics where they don't require Qualcomm diag**, plus our additions (Wi-Fi/BT/app-audit). Where a SnoopSnitch heuristic *does* require diag and we detect a Qualcomm device (not the Seeker, but the architecture is portable), we expose it as an opt-in feature gated on that capability.
+All four projects are GPL-3 — compatible with our Gnirehtet-derived relay base.
 
-Tower database: bundle a quarterly OpenCellID snapshot in-APK (~80 MB compressed for global; ~3 MB for the user's MCC), with an in-app updater for fresh pulls. AIMSICD's `RealmHelper` schema replaced with Room + an `mcc_mnc_index` partial-load strategy so the DB lookups stay sub-millisecond on-device.
+The runtime is therefore layered: **NetMonster-core for MediaTek-aware data collection on the Seeker**, AIMSICD's `BTSAlgorithm` + tower DB for non-root heuristic scoring, SnoopSnitch's higher-level heuristics for paging/encryption analysis, and Crocodile Hunter's TAC/EARFCN/GPS-cross-check heuristics. Plus our additions (Wi-Fi/BT/app-audit + SDR mode).
+
+Tower database: bundle a quarterly OpenCellID snapshot in-APK (~80 MB compressed for global). Room + an `mcc_mnc_index` partial-load strategy so DB lookups stay sub-millisecond on-device. In-app updater for fresh pulls, opt-in, runs through the user's selected Privacy Chain if one is active.
+
+### MediaTek-Specific Detection Path
+
+The Seeker is `arm64-v8a` with a MediaTek SoC. There is no Qualcomm `/dev/diag` — but MediaTek exposes equivalent information through different surfaces. The strategy is layered by privilege:
+
+**Tier 0 — Unprivileged (Seeker default, no root):**
+- **NetMonster-core** as the primary collector. Pulls full LTE/NR cell info via MTK reflection (EARFCN, TAC, eNB-ID, PCI, RSRP/RSRQ/SINR, NR-NSA/SA mode, neighbors, secondary cells, CA bands). This is the data SnoopSnitch reads from `/dev/diag` on Qualcomm; NetMonster reads it from MTK framework internals via reflection.
+- `TelephonyManager.requestCellInfoUpdate()` + `TelephonyCallback.{CellInfoListener, ServiceStateListener, SignalStrengthsListener, DisplayInfoListener}`. The `DisplayInfo` callback exposes the carrier's display capability (5G/LTE+/LTE) which often diverges from actual RAT under attack.
+- Engineering Mode broadcast probes — MediaTek devices respond to `Intent.ACTION_DIAL` with `*#*#3646633#*#*` (Engineering Mode) and `*#*#83781#*#*` (Field Trial). We programmatically launch the dialer with these codes only when the user explicitly opts in from the Threat tab ("Open MediaTek diagnostic"). We do not require this for default operation, but it is the user's fallback for deep modem state.
+
+**Tier 1 — Optional adb-shell access (no root, but USB debugging enabled — fits our existing setup):**
+- `adb shell dumpsys telephony.registry` — exposes per-subscription state including extras the Java API hides (cipher state on some MTK builds, registered TAC history).
+- `adb shell service call iphonesubinfo …` — returns IMEI/IMSI history for re-attach detection.
+- `adb shell getprop | grep -iE 'gsm|ril|modem|mtk'` — MediaTek RIL properties expose `gsm.network.type`, `ril.cipher.algorithm`, `vendor.mtk.signal.report.mode`. Polled by a small background poller in the Mac daemon when the device is tethered; results pushed back to the phone via the existing transport's control frames.
+
+**Tier 2 — Root (not assumed; if user roots their Seeker later):**
+- `/proc/ccci_md1_*` — MediaTek's Cross-Core Communication Interface. Contains modem state machine transitions. Equivalent in spirit to Qualcomm's diag.
+- `/sys/class/ccci_md1_*` — modem firmware version, capability bitmap.
+- `mdlog` (MTKLogger) dumps when enabled — full modem trace; matches what SnoopSnitch's Qualcomm pipeline ingests.
+- AT command channel via `/dev/ttyMT*` (alias varies): supports `AT+CSQ`, `AT+CREG?`, MTK proprietary `AT+EHSR`, `AT+EPSB` for service state.
+
+We implement the architecture for all three tiers. Tier 0 is what activates on a stock Seeker today. Tier 1 activates whenever the phone is tethered to the Mac (we already have the ADB channel open). Tier 2 is dormant unless `/proc/ccci_md1_*` is readable, automatically engaging if the user roots later.
+
+Detection-depth indicator in the Threat tab UI: "Mode: MediaTek (Tier 0 + Tier 1 active)" so the user knows what coverage they have.
+
+### Crocodile Hunter Integration
+
+Two-mode integration:
+
+**Software-only mode (default, always on):** port the EFF Crocodile Hunter Android client's data collector and Python heuristics to Kotlin / Rust.
+
+Ported heuristics from Crocodile Hunter:
+- **TAC anomaly with GPS cross-check**: TAC change without geographic movement (cross-checked against `FusedLocationProviderClient` + linear acceleration). The strongest CH signal: stingrays often announce a new TAC to force re-attach (and re-leak IMSI).
+- **EARFCN out of allocation**: LTE channel outside the user's MCC/MNC operator's published EARFCN allocation. CH bundles operator allocations; we port the table and update via the same in-APK quarterly bundle as OpenCellID.
+- **Suspicious eNB-ID / sector count**: CH's "tower fingerprint" — an eNB legitimately operates a small number of sectors; an attacker often runs a single sector. Cross-references the tower DB.
+- **Cell Found Rate (CFR) anomaly**: > N distinct PCI / cell-ID observations in T seconds while stationary.
+- **Re-attach storm**: > N `EVENT_TAC_CHANGE` + `EVENT_CELL_CHANGE` in M seconds — characteristic of forced re-attach.
+- **TMSI churn (when exposed)**: TMSI cycling faster than carrier baseline.
+
+**SDR mode (optional, USB-C OTG):** Seeker's USB-C supports OTG with bus-power-budget for an RTL-SDR (~$30) or HackRF. When user plugs in a supported SDR, we detect the VID/PID and enable SDR mode.
+
+- Driver: bundle `librtlsdr-android` (Marto Lazo's port, GPL-2; we link dynamically and document the license boundary). HackRF support via `hackrf_android` (likewise dynamic-link, license preserved).
+- Scanner: a Rust component (compiled to `libtetherand-sdr.so`) tunes through the operator's LTE bands, decodes MIB/SIB1/SIB2/SIB3 broadcast control messages via a stripped-down `srsRAN`-derived decoder, captures Random Access channel events.
+- Heuristics gated on SDR mode (CH-derived):
+  - SIB content mismatch — the SIB advertised on PCI X differs from what we've previously seen on that PCI (likely fake cell).
+  - SIB cell-barring flag flipping on/off rapidly.
+  - Master Information Block (MIB) bandwidth mismatch with EARFCN expectation.
+  - Persistent Random Access bursts (paging storms preceding silent SMS).
+- Storage: PCAP-like binary log to `app-internal-storage/sdr-captures/`, viewable from Threat tab, exportable on demand (opt-in only).
+
+**Server-side correlation (deliberately not adopted):** EFF Crocodile Hunter syncs cell observations to a community server. We **do not** sync by default. We include an opt-in toggle "Share anonymized observations with the EFF Crocodile Hunter community" — off by default, behind a clear consent screen, and the data flows only through the user's currently-active Privacy Chain if one is on.
+
+UI surface for CH features:
+- Threat tab gets a "Cellular details" panel showing live TAC, PCI, EARFCN, eNB-ID, neighbors.
+- An "SDR" sub-tab appears only if an SDR is connected; shows live SIB decode and the MIB/SIB sparkline.
+- Settings → "Community" page hosts the opt-in for EFF server sync.
 
 ### Service
 
@@ -247,17 +311,36 @@ Tower database: bundle a quarterly OpenCellID snapshot in-APK (~80 MB compressed
 
 ### Heuristics (alert ≥ threshold)
 
-Cellular (ported / adapted from AIMSICD + SnoopSnitch, modernised):
+Cellular — Tier 0 / Tier 1 (no root, software-only):
 
 - **Stingray fallback** (SnoopSnitch-derived): RAT downgrades from 5G/LTE to UMTS/GSM in an area baseline-recorded as 4G/5G covered. Confidence increases with sudden + stationary (low accel) + new cell ID. Severity scored on AIMSICD's `BTSAlgorithm` weights.
 - **Fake BTS** (AIMSICD `BTSAlgorithm`): cell `CID/LAC/MCC/MNC` not present in OpenCellID snapshot for the user's area, AND anomalously high signal, AND zero `neighboringCellInfo`. Tower-DB lookup is local.
 - **LAC change anomaly** (AIMSICD): LAC changes more than threshold/hour while stationary; LAC value outside known carrier LAC ranges.
 - **Femtocell pattern** (AIMSICD): CID values in vendor-known femtocell ranges, with `getCellLocation()` GPS inconsistency.
 - **Silent SMS** (SnoopSnitch-derived, best-effort): binary SMS arrivals to phantom ports detected via `SmsManager` broadcast inspection; full coverage limited by Android 12+ permissions, but stalking-grade silent SMS is still partly visible.
-- **Encryption indicator** (SnoopSnitch-derived): when carrier `service_state` extras expose cipher info, alert on A5/0 (no encryption). Some carriers expose this via `TelephonyManager` extras; many don't — flag is presented as "data available" / "not exposed by carrier".
+- **Encryption indicator** (SnoopSnitch-derived): when carrier `service_state` extras expose cipher info, alert on A5/0 (no encryption). Some carriers expose this via `TelephonyManager` extras; many don't — flag is presented as "data available" / "not exposed by carrier". On Tier 1 we additionally poll the MediaTek RIL prop `ril.cipher.algorithm` via the tethered ADB channel.
 - **Cell fingerprint mismatch** (SnoopSnitch-derived): persistent cell IDs whose signal/neighbor fingerprint changes day-over-day.
+- **TAC change without movement** (Crocodile Hunter): TAC change while GPS + accel show the user is stationary. Strongest CH signal — characteristic of a re-attach attack.
+- **EARFCN out of allocation** (Crocodile Hunter): LTE EARFCN outside the user's operator's published allocation table.
+- **Suspicious eNB sector count** (Crocodile Hunter): a tower DB entry with a single sector when the operator's typical eNB runs ≥ 3.
+- **Cell Found Rate anomaly** (Crocodile Hunter): > N distinct PCI / cell-ID observations in T seconds while stationary.
+- **Re-attach storm** (Crocodile Hunter): > N TAC-change + cell-change events in M seconds.
+- **TMSI churn** (Crocodile Hunter, when TMSI exposed): TMSI cycling faster than carrier baseline.
 - **TA jump** (our addition): Timing Advance > N rings change in < 5 s without motion (Linear Accel below threshold) → suggests cell location forgery or sudden cell switch.
 - **Cell flapping** (our addition): > 4 cell-ID handovers in 60 s while stationary.
+- **MediaTek extras** (NetMonster-core): NR-NSA / NR-SA mode inconsistency (e.g. NSA reported but no LTE anchor); secondary serving cell suddenly disappearing; carrier-aggregation bands collapsing while signal nominally strong.
+
+Cellular — SDR mode (optional, RTL-SDR / HackRF via USB-C OTG):
+
+- **SIB content mismatch** (Crocodile Hunter SDR): SIB1/SIB2/SIB3 broadcast on a given PCI differs from previous observations on that PCI.
+- **Cell-barring flag flapping** (Crocodile Hunter SDR): SIB1 `cellBarred` flag toggles rapidly.
+- **MIB bandwidth mismatch** (Crocodile Hunter SDR): Master Information Block bandwidth advertised inconsistent with EARFCN expectation.
+- **Paging-storm pattern** (Crocodile Hunter SDR): persistent bursts of paging messages preceding silent-SMS-style stalking.
+
+Cellular — Tier 2 (root, dormant on stock Seeker; auto-activates if user roots):
+
+- **Modem state transitions** (MediaTek `/proc/ccci_md1_*`): RRC connection releases without legitimate cause; service interruptions while signal is nominal — these are the events SnoopSnitch reads from Qualcomm `/dev/diag`, equivalents read from MTK's CCCI.
+- **`mdlog` trace anomalies**: when MTKLogger is enabled, parse the dumps for RRC + NAS-layer messages indicating active attacks.
 
 Wi-Fi / Bluetooth / App-audit (our additions, not in AIMSICD or SnoopSnitch):
 
@@ -274,9 +357,13 @@ Each heuristic produces a typed `Alert(severity, kind, evidence, recommendations
 
 Threat tab:
 - **Risk score 0-100** — weighted aggregate of last-24-h alert severity.
-- **Live signal map** — 5 sparklines (RAT, RSSI, neighbors, TA, cell flaps), color-coded.
+- **Detection-depth pill** — "Mode: MediaTek Tier 0+1 (NetMonster reflection 8/12, ADB-tier active)" so the user always knows what coverage is live.
+- **Cellular details panel** — live TAC, PCI, EARFCN, eNB-ID, neighbor count, encryption indicator, NR/LTE mode.
+- **Live signal map** — sparklines for RAT, RSSI, neighbors, TA, cell flaps, TAC churn, EARFCN, color-coded.
 - **Alert feed** — most recent 50 alerts, expandable evidence, "dismiss" / "snooze 1 h" / "always alert".
-- **Threat detail** — per-alert page explaining the heuristic, the evidence, and recommended actions.
+- **Threat detail** — per-alert page explaining the heuristic, the evidence (incl. the raw NetMonster / CH fields that triggered it), and recommended actions.
+- **SDR sub-tab** — appears only when an RTL-SDR or HackRF is connected; live SIB1/SIB2/SIB3 decode, MIB sparkline, raw PCAP-style capture viewer, export.
+- **MediaTek diagnostics** — explicit button "Open Engineering Mode (`*#*#3646633#*#*`)" for user-driven inspection.
 - **Panic button** — "Airplane Mode + activate Privacy Chain on Tor only"; one tap.
 
 ### Privacy of the Threat Service
@@ -331,10 +418,12 @@ The userspace TCP/IP stack is forked from Gnirehtet's `relay-rust` initially. A 
 | **M4** Mullvad + PQ | Mullvad API client, account login, PQ tunnel, multihop, DAITA, obfuscation toggles, kill-switch, split-tunnel | 8-12 h | + Mullvad |
 | **M5** NymVPN | `nym-vpn-client` embedded via JNI, mnemonic login, entry/exit selection | 6-10 h | + Nym |
 | **M6** Tor + bridges + PQ | Cross-compile `tor` and PTs for arm64-android, configure as a hop, BridgeDB integration, control-port wrapper, PQ flags | 14-18 h | Full chain library |
-| **M7** Threat detection | Port AIMSICD `BTSAlgorithm` + tower DB, port SnoopSnitch high-level heuristics, modernise to Android 16 (`TelephonyCallback`, Room), Wi-Fi/BT/app-audit signal sources, per-location baselining, Threat tab + alert feed + panic button | 16-20 h | Threat subsystem live |
+| **M7a** Threat MVP (no SDR) | NetMonster-core integration (Tier 0), AIMSICD `BTSAlgorithm` + bundled OpenCellID, SnoopSnitch high-level heuristics, Crocodile Hunter phone-side heuristics (TAC / EARFCN / GPS / CFR), Tier 1 ADB-channel collector in Mac daemon, Wi-Fi/BT/app-audit, per-location baseline, Threat tab + alert feed + panic button | 20-26 h | Cellular + Wi-Fi + app threat detection live on Seeker |
+| **M7b** SDR mode (optional) | librtlsdr-android + hackrf_android dynamic-link, USB-C OTG SDR detection, `libtetherand-sdr.so` LTE control-channel decoder (srsRAN-derived), CH SDR heuristics, PCAP capture, SDR sub-tab | 12-16 h | SDR mode for users with $30 RTL-SDR |
+| **M7c** Tier 2 (root, dormant) | `/proc/ccci_md1_*` reader, `mdlog` parser, AT-command channel via `/dev/ttyMT*`, capability-gating so it's a no-op on un-rooted devices | 4-6 h | Auto-activates if user roots later |
 | **M8** Polish & release | Smoke tests, signed release APK, install scripts, README, performance tuning | 6-8 h | Shippable |
 
-**Total: ~85-115 h of focused work.**
+**Total: ~105-145 h of focused work** (M7 expanded into a/b/c).
 
 Three independently shippable subsystems:
 - **Tether (M1–M2)** — works alone, ships first; this is the immediate `connect.sh` replacement.
@@ -349,8 +438,12 @@ Parallelization opportunities within M2 (BT, AOA, TUI, LaunchAgent are largely i
 - **AOA on Solana Seeker.** USB Accessory protocol is occasionally finicky on OEM USB stacks. Mitigation: ship USB-ADB as default; mark AOA as opt-in until validated.
 - **Bluetooth throughput.** Realistic RFCOMM ceiling on Android is 1-3 Mbps; advertise this in UI so users don't expect USB speeds.
 - **Tor PQ flag stability.** Tor's PQ rollout is still in progress as of design date. Spec includes the toggle but defaults to whatever Tor's recommended stable configuration is at build time. If PQ flags are unstable, the toggle is greyed-out with a "not yet available" tooltip.
-- **MediaTek baseband visibility.** No Qualcomm `/dev/diag` means SnoopSnitch's diag-mode heuristics aren't directly available; we rely on AIMSICD-style `TelephonyManager` heuristics plus the higher-level subset of SnoopSnitch heuristics. We document this clearly in the Threat tab ("Detection depth: heuristic — strongest on Qualcomm devices") and recommend cross-checking with hardware-level tools (Crocodile Hunter, etc.) when in high-threat environments.
+- **MediaTek baseband visibility.** No Qualcomm `/dev/diag` is available on the Seeker. We compensate with a three-tier strategy (Tier 0 NetMonster-core reflection + AIMSICD/SnoopSnitch high-level heuristics + Crocodile Hunter; Tier 1 over the tethered ADB channel; Tier 2 dormant root path for if/when the user roots). The Threat tab surfaces the active tier so the user always knows their detection depth. Optional RTL-SDR-via-USB-C-OTG mode (M7b) restores the broadcast-control-channel visibility that diag mode would otherwise give us — and arguably exceeds it, since SDR captures the air interface directly.
 - **AIMSICD/SnoopSnitch staleness.** Both projects target older Android versions and APIs (`PhoneStateListener` instead of `TelephonyCallback`; pre-scoped-storage I/O; pre-permission-revamp). Porting is a partial rewrite, not a copy-paste; we keep the algorithms and rewrite the plumbing for Android 16. Each ported heuristic gets a unit test against canned signal fixtures so we know the algorithm survived the port.
+- **NetMonster-core MTK reflection brittleness.** Reflection into MediaTek's framework internals can break across vendor builds. NetMonster-core abstracts much of this, but our Seeker build (Solana Mobile's Android 16 customisation) may need patches. Mitigation: every Tier 0 collector has a `try/catch (ReflectiveOperationException)` fallback to `TelephonyManager.getAllCellInfo()` so degraded reflection turns into shallower data, never crashes. Surface "Reflection coverage: 8/12 fields available" diagnostic in the Threat tab so the user can see and we can fix.
+- **SDR driver licensing.** `librtlsdr-android` is GPL-2; our distribution is GPL-3; GPL-2-or-later upgrades fine to GPL-3. `hackrf_android` is also GPL-2-or-later. Both are dynamic-linked and we ship the source / linkage instructions in `NOTICE`.
+- **SDR battery / thermal.** Running an SDR over OTG draws ~250-400 mA and heats. Mitigation: SDR mode auto-suspends below 20% battery and after 10 minutes without an interesting event; user can override.
+- **Engineering Mode dialer codes.** MTK Engineering Mode (`*#*#3646633#*#*`) opens a system app; we cannot read its output programmatically. We only use the dialer codes as a *user-driven* fallback presented in the UI; the automated path is NetMonster-core + ADB-tier polls.
 - **Mullvad / Nym API changes.** Both vendors version their public APIs; we pin and add CI canaries that exercise the documented endpoints monthly.
 - **Single-VPN constraint on Android.** Android only allows one active `VpnService`; we are that one. Conflicting apps (e.g. Mullvad's own app, Mullvad already installed on the user's Seeker) are detected on pre-flight and the UI guides the user to disable them.
 - **License pollution.** GPL-3 from Gnirehtet propagates to the relay core. Acceptable for v1; document clearly in `LICENSE` and `NOTICE`. Future relay rewrite can relicense.
