@@ -558,6 +558,43 @@ The runnable checklist (script does these or prompts for them):
 
 This pre-flight script ships as **M0** — buildable and runnable today, no Kotlin involved. See updated milestones.
 
+### Determinism Principle (load-bearing)
+
+Every defense in Tetherand has a **deterministic primary mechanism** — a clear rule, threshold, or heuristic — whose output drives any consequential action (block, quarantine, alert escalation, wipe). Local AI classifiers are **contributory signals only**: they raise risk scores, surface warning banners, and unlock additional UI affordances, but they cannot be the sole trigger for any action.
+
+This is non-negotiable. The deterministic core makes Tetherand auditable, testable, and predictable. Classifiers add nuance and catch novel patterns rules miss, at the cost of probabilistic behavior — kept advisory by design.
+
+Mapping for each AI-era defense:
+
+| Defense | Deterministic primary | Contributory classifier (advisory) |
+|---|---|---|
+| Inbound-message screen | URL-reputation + phishing-keyword regex + sender-history + RCS-anomaly rules | `phi-tetherand-3b-q4` verdict |
+| Voice-deepfake on call | User-initiated "verify caller" Signal-handshake + voiceprint exact-match against trusted-contact vault | `voiceguard-v1` synthesis-artifact score |
+| Vishing pattern | Conversation-scaffold rules (urgency + authority + secrecy + financial-ask + channel-mismatch) | `phi-tetherand-3b-q4` scaffold-detection |
+| LLM-text "AI?" badge | Open-algorithm perplexity test (no neural component required) | `textguard-v1` neural verdict |
+| QR / image lure | URL-pattern + reputation DB + perceptual-hash blocklist | `qrguard-v1` perturbation-pattern score |
+| Prompt-injection clipboard | Regex match against known injection scaffolds | none |
+| Provenance check | C2PA / SynthID / Content Credentials signature verify (cryptographic) | none |
+| Egress LLM-API watch | SNI pattern match (rule-only) | none |
+| NPU sysfs watcher | Process-attribution + foreground-state rule | none |
+| OSINT exposure dashboard | HIBP + IntelligenceX API queries via Privacy Chain | none |
+| Inbound-call verification flow | YubiKey touch or known-voiceprint hash | `voiceguard-v1` corroboration |
+| Hardened-Mode panic/wipe/burn | User confirmation + alert-rule threshold | NEVER |
+| Tether tear-down / kill-switch | Connection-health rule + VPN state | NEVER |
+| Attestation diff (pre/post DEFCON) | Cryptographic hash comparison | NEVER |
+
+Anything in the "deterministic primary" column functions fully with the classifier removed. Anything in the "contributory" column improves UX and catches edge cases, but is always suppressible by the user and never gates a destructive action.
+
+### Local-Only AI Constraint (load-bearing)
+
+All Tetherand AI inference runs on-device, on the Seeker's MediaTek NPU via LiteRT + NNAPI delegate. The 4-model bundle (~2.4 GB compressed) ships in-APK. Models are INT4-quantised. **No prompt, classification request, or telemetry is ever sent to a cloud LLM API** under any circumstance.
+
+The egress-LLM-API SNI watch defense exists precisely to catch other apps that violate this principle — Tetherand itself never connects to `api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`, Vertex AI endpoints, etc. The watch list is maintained as part of the threat-feed bundle and updated through the user's active Privacy Chain only.
+
+Model updates flow only through the active Privacy Chain when one is on; updates are signed via cosign against a pinned public key shipped in the APK. If no chain is active, model updates are deferred. There is no out-of-band update path.
+
+If at any future point a cloud-LLM integration would be tempting (e.g. for stronger long-context analysis), the policy is: it stays out. The constraint is the spec.
+
 ### AI-Era Threats (first DEFCON of the LLM-mass-market era)
 
 The 2026 DEFCON is operating in a fundamentally different threat landscape than any prior year. Attackers now have:
@@ -697,7 +734,7 @@ The userspace TCP/IP stack is forked from Gnirehtet's `relay-rust` initially. A 
 | **M7c** Tier 2 (root, dormant) | `/proc/ccci_md1_*` reader, `mdlog` parser, AT-command channel via `/dev/ttyMT*`, capability-gating so it's a no-op on un-rooted devices | 4-6 h | Auto-activates if user roots later |
 | **M8** Polish & release | Smoke tests, signed release APK, install scripts, README, performance tuning | 6-8 h | Shippable |
 | **M9** Hardened Mode (in-app) | DEFCON Mode toggle + Quick Settings tile, kill-switch + per-app firewall, attestation snapshot + diff UI, decoy listeners + honeytokens, BLE tracker scan UI, USB data-block + selfie traps, accelerometer tamper, wallet firewall (Solana), ultrasonic listener, TLS-pinning audit, decoy-profile + YubiKey unlock fallback, incident-response runbook | 22-30 h | Full DEFCON-grade physical / network / cellular defense in the app |
-| **M10** AI-era defenses | Bundle 4-model classifier stack (`phi-tetherand-3b-q4`, `voiceguard-v1`, `textguard-v1`, `qrguard-v1`); NPU runtime via LiteRT + NNAPI; inbound-message AI screen; voice-deepfake detection on calls; vishing scaffold classifier; LLM-text "AI?" badge; QR-image lure inspector; prompt-injection-resistant clipboard; C2PA / SynthID provenance check; mic-use awareness; OSINT exposure dashboard; NPU sysfs watcher; egress-LLM-API SNI watch; YubiKey-only 2FA in Hardened Mode; conference live threat feed | 26-34 h | Full AI-era threat coverage |
+| **M10** AI-era defenses (local-only, contributory) | Build deterministic primaries FIRST for every defense (URL-reputation + phishing regex, voiceprint vault, perplexity test, URL-pattern + perceptual hash, SNI rule, regex scaffolds, signature verify). Then bundle 4-model classifier stack (`phi-tetherand-3b-q4`, `voiceguard-v1`, `textguard-v1`, `qrguard-v1`) on Seeker's NPU via LiteRT + NNAPI as **contributory** layer. Egress LLM-API SNI watch. Prompt-injection clipboard scrubber. C2PA/SynthID/Content Credentials provenance. Mic-use awareness. OSINT exposure dashboard via Privacy Chain (HIBP, IntelligenceX). YubiKey-only 2FA in Hardened Mode. Conference live threat feed. **Hard constraint**: no cloud LLM API ever called. Models bundled in-APK, updated only through active Privacy Chain. | 26-34 h | Full AI-era threat coverage, deterministic core + advisory classifiers |
 
 **Total: ~157-215 h of focused work** (M7 expanded into a/b/c; M0, M9, and M10 added; all milestones are required scope).
 
