@@ -1,11 +1,10 @@
 [workspace]
 resolver = "3"
 members = [
-    "codec",
-    "transport-api",
-    "transport-adb",
-    "transport-tcp",
-    "cli",
+    "codec",          # used by Android side and reserved for M2+ control frames
+    "transport-api",  # Transport trait — used by Android, reserved for M2+ Bluetooth/AOA on Mac
+    "core",           # forked Gnirehtet relay-rust (Apache-2.0); handles TCP+TUN userspace stack
+    "cli",            # `tetherand` binary; wraps core::relay() + adb forward
 ]
 
 [workspace.package]

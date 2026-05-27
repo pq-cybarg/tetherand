@@ -4,7 +4,18 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
+rust-version.workspace = true
 
 [[bin]]
-name = "tetherand-cli-stub"
+name = "tetherand"
 path = "src/main.rs"
+
+[dependencies]
+tetherand-relay-core = { path = "../core" }
+clap   = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+log = "0.4"
+env_logger = "0.11"
+ctrlc = { version = "3.4", features = ["termination"] }

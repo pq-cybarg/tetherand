@@ -1,0 +1,18 @@
+[package]
+name = "tetherand-relay-core"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Userspace TCP/IP relay (forked from Genymobile/gnirehtet relay-rust, Apache-2.0)"
+
+[lib]
+name = "tetherand_relay_core"
+path = "src/lib.rs"
+
+[dependencies]
+log       = "0.4"
+mio       = "0.6"
+slab      = "0.4"
+byteorder = "1.5"
+rand      = "0.7"
+chrono    = "0.4"
