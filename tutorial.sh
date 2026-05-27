@@ -433,7 +433,6 @@ cat >> "$HTML" <<'STATIC_BODY'
     <tr><td><strong>M3</strong></td><td>Privacy chain core: hop interface, WireGuard generic hop (BoringTun via JNI), chain orchestrator, Privacy tab with chain visualizer.</td><td>14-18 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
     <tr><td><strong>M4a-c</strong></td><td>Mullvad classic WG + PQ tunnel (ML-KEM-1024 hybrid) + AF_INET-only kill-switch. DAITA / obfuscation / multihop / split-tunnel = M4d-g.</td><td>~10 h</td><td><span class="badge ok">SHIPPED</span></td></tr>
     <tr><td><strong>M5</strong></td><td>NymVPN embedded via JNI, 2-hop entry/exit through Sphinx mixnet.</td><td>6-10 h</td><td><span class="badge warn">NEXT</span></td></tr>
-    <tr><td><strong>M5</strong></td><td>NymVPN embedded via JNI, 2-hop entry/exit through Sphinx mixnet.</td><td>6-10 h</td><td>planned</td></tr>
     <tr><td><strong>M6</strong></td><td>Tor + all PT bridges (obfs4, snowflake, meek, conjure, webtunnel) + PQ flags + vanguards.</td><td>14-18 h</td><td>planned</td></tr>
     <tr><td><strong>M7a</strong></td><td>Threat MVP (no SDR): NetMonster Tier 0 + AIMSICD BTSAlgorithm + bundled OpenCellID + SnoopSnitch high-level + Crocodile Hunter phone-side heuristics + Wi-Fi/BT/app audit + per-location baseline + Threat tab.</td><td>20-26 h</td><td>planned</td></tr>
     <tr><td><strong>M7b</strong></td><td>SDR mode: librtlsdr-android + hackrf_android + LTE control-channel decoder, SIB/MIB analysis, paging-storm detection.</td><td>12-16 h</td><td>planned</td></tr>
