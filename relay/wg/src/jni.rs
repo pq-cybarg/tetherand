@@ -128,3 +128,56 @@ pub extern "system" fn Java_dev_tetherand_app_chain_WireGuardHop_nativeInitLog(
         android_logger::Config::default().with_max_level(log::LevelFilter::Info),
     );
 }
+
+// ---- Mullvad / KEM bindings ----
+
+use crate::KemKeypair;
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_tetherand_app_mullvad_MullvadPqClient_nativeKemGenerate(
+    _env: JNIEnv, _class: JClass,
+) -> jlong {
+    let kp = Box::new(KemKeypair::generate());
+    Box::into_raw(kp) as jlong
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_tetherand_app_mullvad_MullvadPqClient_nativeKemPublicKey(
+    mut env: JNIEnv, _class: JClass, handle: jlong,
+) -> jbyteArray {
+    if handle == 0 { return jba(&mut env, &[]); }
+    let kp = unsafe { &*(handle as *const KemKeypair) };
+    jba(&mut env, kp.public_bytes())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_tetherand_app_mullvad_MullvadPqClient_nativeKemDecapsulate(
+    mut env: JNIEnv, _class: JClass, handle: jlong, ciphertext: JByteArray,
+) -> jbyteArray {
+    if handle == 0 { return jba(&mut env, &[]); }
+    let kp = unsafe { &*(handle as *const KemKeypair) };
+    let ct = copy_jba(&mut env, &ciphertext);
+    match kp.decapsulate(&ct) {
+        Ok(ss) => jba(&mut env, &ss),
+        Err(_) => jba(&mut env, &[]),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_tetherand_app_mullvad_MullvadPqClient_nativeKemFree(
+    _env: JNIEnv, _class: JClass, handle: jlong,
+) {
+    if handle == 0 { return; }
+    unsafe { let _ = Box::from_raw(handle as *mut KemKeypair); }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_tetherand_app_mullvad_MullvadConfigBuilder_nativeGenerateX25519Keypair(
+    mut env: JNIEnv, _class: JClass,
+) -> jbyteArray {
+    let (priv_key, pub_key) = crate::generate_x25519_keypair();
+    let mut both = Vec::with_capacity(64);
+    both.extend_from_slice(&priv_key);
+    both.extend_from_slice(&pub_key);
+    jba(&mut env, &both)
+}
