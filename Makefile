@@ -1,5 +1,5 @@
 # Tetherand top-level orchestration. POSIX-compatible.
-.PHONY: all build relay apk install uninstall clean test smoke release
+.PHONY: all build relay apk native-wg install uninstall clean test smoke release chain
 
 REPO    := $(shell pwd)
 RELAY   := $(REPO)/relay
@@ -16,11 +16,17 @@ relay:
 	@cp $(RELAY)/target/release/tetherand $(BIN)/tetherand
 	@echo "  ✓ relay built at $(BIN)/tetherand"
 
-apk:
+native-wg:
+	bash scripts/build-wg-android.sh
+
+apk: native-wg
 	cd $(ANDROID) && ./gradlew :app:assembleDebug
 	@mkdir -p $(BIN)
 	@cp $(ANDROID)/app/build/outputs/apk/debug/app-debug.apk $(BIN)/tetherand.apk
 	@echo "  ✓ APK built at $(BIN)/tetherand.apk"
+
+chain: build
+	@echo "Chain build complete. Open Tetherand → Privacy tab to configure."
 
 # Release variant of the APK. Uses the debug signing config (the spec
 # defers a real production-signing key to M8).

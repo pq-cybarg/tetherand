@@ -7,6 +7,7 @@ members = [
     "transport-tcp",  # TCP/LAN transport with mDNS (same disposition)
     "core",           # forked Gnirehtet relay-rust (Apache-2.0); handles TCP+TUN userspace stack
     "cli",            # `tetherand` binary; M1 wraps core::relay() + adb forward
+    "wg",             # M3: BoringTun WireGuard wrapper + JNI bindings for Android
 ]
 
 [workspace.package]
