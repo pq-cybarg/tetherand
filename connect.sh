@@ -79,6 +79,30 @@ fi
 
 model="$("$ADB" -s "$serial" shell getprop ro.product.model 2>/dev/null | tr -d '\r')"
 
+# Prefer the custom Tetherand binary + APK from M1 once they exist;
+# fall back to the upstream Gnirehtet stopgap. Both paths are functionally
+# equivalent over USB.
+if [[ -x "$HERE/bin/tetherand" && -f "$HERE/bin/tetherand.apk" ]]; then
+  if [[ "$mode" == "stop" ]]; then
+    echo ">> stopping tetherand on $serial ($model)"
+    # `tetherand` has no explicit `stop` subcommand in M1 (Ctrl+C handles it).
+    # Use adb to fire the STOP intent the same way Ctrl+C would.
+    exec "$ADB" -s "$serial" shell am start -a dev.tetherand.app.STOP -n dev.tetherand.app/.TetherandActivity
+  fi
+  if (( reinstall )); then
+    echo ">> reinstalling tetherand APK on $serial ($model)"
+    "$HERE/bin/tetherand" reinstall --device "$serial"
+  fi
+  echo ">> reverse-tethering $serial ($model) via USB (tetherand M1)"
+  echo "   relay: $HERE/bin/tetherand"
+  echo "   apk:   $HERE/bin/tetherand.apk"
+  echo "   ctrl-c to disconnect"
+  echo
+  exec "$HERE/bin/tetherand" run --device "$serial" --transport adb
+fi
+
+# --- fallback: upstream Gnirehtet stopgap ---
+
 if [[ "$mode" == "stop" ]]; then
   echo ">> stopping reverse tether on $serial ($model)"
   exec "$RELAY" stop "$serial"
@@ -89,7 +113,7 @@ if (( reinstall )); then
   "$RELAY" reinstall "$serial"
 fi
 
-echo ">> reverse-tethering $serial ($model) via USB"
+echo ">> reverse-tethering $serial ($model) via USB (stopgap: upstream Gnirehtet)"
 echo "   relay: $RELAY"
 echo "   apk:   $APK"
 echo "   dns:   ${dns:-8.8.8.8 (default)}"
