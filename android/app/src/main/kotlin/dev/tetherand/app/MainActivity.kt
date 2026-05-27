@@ -1,11 +1,11 @@
 package dev.tetherand.app
 
 import android.app.Activity
-import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -52,6 +54,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()                       // opt into edge-to-edge (Android 15+ default)
         setContent {
             TetherandTheme {
                 TetherScreen(
@@ -67,18 +70,14 @@ class MainActivity : ComponentActivity() {
         if (prep != null) vpnConsent.launch(prep) else startVpn()
     }
 
+    /** Use the legacy Java helper so the EXTRA_VPN_CONFIGURATION parcel + correct
+     *  startForegroundService dispatch land identically to the CLI path. */
     private fun startVpn() {
-        val i = Intent(this, TetherandService::class.java)
-        // Forward to the existing GnirehtetService.start helper via its
-        // ACTION_START_VPN signature; the legacy Java code expects this.
-        i.action = "dev.tetherand.app.START_VPN"
-        startForegroundService(i)
+        TetherandService.start(this, VpnConfiguration())
     }
 
     private fun stopVpn() {
-        val i = Intent(this, TetherandService::class.java)
-        i.action = "dev.tetherand.app.CLOSE_VPN"
-        startService(i)
+        TetherandService.stop(this)
     }
 }
 
@@ -109,7 +108,11 @@ private fun TetherScreen(onStart: () -> Unit, onStop: () -> Unit) {
         color = MaterialTheme.colorScheme.background,
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(20.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

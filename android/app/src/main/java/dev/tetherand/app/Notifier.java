@@ -64,7 +64,17 @@ public class Notifier {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             createNotificationChannel();
         }
-        context.startForeground(NOTIFICATION_ID, createNotification(false));
+        // Android 14 (API 34) requires the foreground service type to be
+        // declared at startForeground() time for the `specialUse` subtype
+        // we use in AndroidManifest.xml.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            context.startForeground(
+                NOTIFICATION_ID,
+                createNotification(false),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        } else {
+            context.startForeground(NOTIFICATION_ID, createNotification(false));
+        }
     }
 
     public void stop() {
@@ -84,11 +94,15 @@ public class Notifier {
 
     private Notification.Action createStopAction() {
         Intent stopIntent = TetherandService.createStopIntent(context);
-        PendingIntent stopPendingIntent = PendingIntent.getService(context, 0, stopIntent, PendingIntent.FLAG_ONE_SHOT);
-        // the non-deprecated constructor is not available in API 21
+        // Android 12 (S, API 31) requires every PendingIntent to declare
+        // FLAG_IMMUTABLE or FLAG_MUTABLE — bare FLAG_ONE_SHOT throws.
+        int piFlags = PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent stopPendingIntent = PendingIntent.getService(context, 0, stopIntent, piFlags);
         @SuppressWarnings("deprecation")
-        Notification.Action.Builder actionBuilder = new Notification.Action.Builder(R.drawable.ic_close_24dp, context.getString(R.string.stop_vpn),
-                stopPendingIntent);
+        Notification.Action.Builder actionBuilder = new Notification.Action.Builder(
+            R.drawable.ic_close_24dp,
+            context.getString(R.string.stop_vpn),
+            stopPendingIntent);
         return actionBuilder.build();
     }
 
