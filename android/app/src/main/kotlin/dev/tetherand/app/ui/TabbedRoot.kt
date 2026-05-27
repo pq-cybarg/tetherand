@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontFamily
 fun TabbedRoot(
     onTetherStart: () -> Unit,
     onTetherStop: () -> Unit,
-    onChainStart: (String) -> Unit,
+    onChainStart: (String, Boolean) -> Unit,
     onChainStop: () -> Unit,
 ) {
     var selected by remember { mutableStateOf(0) }

@@ -2,6 +2,7 @@ package dev.tetherand.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,12 +36,19 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 @Composable
-fun PrivacyScreen(onStart: (String) -> Unit, onStop: () -> Unit) {
+fun PrivacyScreen(onStart: (String, Boolean) -> Unit, onStop: () -> Unit) {
     var running by remember { mutableStateOf(false) }
     var wgText by remember { mutableStateOf(SAMPLE_WG_CONFIG) }
+    var account by remember { mutableStateOf("") }
+    var servers by remember { mutableStateOf<List<dev.tetherand.app.mullvad.MullvadWgServer>>(emptyList()) }
+    var picked by remember { mutableStateOf<dev.tetherand.app.mullvad.MullvadWgServer?>(null) }
+    var pqEnabled by remember { mutableStateOf(true) }
+    var mullvadError by remember { mutableStateOf<String?>(null) }
     val scroll = rememberScrollState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -85,6 +94,84 @@ fun PrivacyScreen(onStart: (String) -> Unit, onStop: () -> Unit) {
             }
         }
 
+        // Mullvad card
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Mullvad", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                OutlinedTextField(
+                    value = account,
+                    onValueChange = { account = it.filter { c -> c.isDigit() }.take(16) },
+                    label = { Text("Mullvad account number (16 digits)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    val api = dev.tetherand.app.mullvad.MullvadApi()
+                                    servers = api.listRelays().wireguard.relays.filter { it.active }
+                                    mullvadError = null
+                                } catch (t: Throwable) { mullvadError = t.message }
+                            }
+                        },
+                        enabled = account.length == 16,
+                    ) { Text("Fetch servers") }
+                    if (servers.isNotEmpty()) {
+                        Text("${servers.size} active", color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp)
+                    }
+                }
+                if (servers.isNotEmpty()) {
+                    // Simple scrollable Column rather than LazyColumn —
+                    // server lists are ~50 items so virtualization is
+                    // overkill, and avoids the LazyListScope.items import.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        for (s in servers) {
+                            Text(
+                                s.display,
+                                color = if (s == picked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { picked = s }
+                                    .padding(vertical = 4.dp),
+                            )
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = pqEnabled, onCheckedChange = { pqEnabled = it })
+                    Spacer(Modifier.padding(end = 8.dp))
+                    Text("Post-quantum tunnel (ML-KEM-1024)", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                }
+                Button(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val server = picked ?: return@launch
+                                val api = dev.tetherand.app.mullvad.MullvadApi()
+                                val (cfg, _) = dev.tetherand.app.mullvad.MullvadConfigBuilder.build(api, account, server)
+                                wgText = configToText(cfg)
+                                mullvadError = null
+                            } catch (t: Throwable) { mullvadError = t.message }
+                        }
+                    },
+                    enabled = picked != null && account.length == 16,
+                ) { Text("Build config from Mullvad") }
+                if (mullvadError != null) {
+                    Text(mullvadError!!, color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
+                }
+            }
+        }
+
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("WireGuard config", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
@@ -105,13 +192,32 @@ fun PrivacyScreen(onStart: (String) -> Unit, onStop: () -> Unit) {
 
         if (!running) {
             Button(
-                onClick = { running = true; onStart(wgText) },
+                onClick = { running = true; onStart(wgText, pqEnabled) },
                 enabled = wgText.contains("[Interface]") && wgText.contains("[Peer]"),
             ) { Text("Start chain") }
         } else {
             Button(onClick = { running = false; onStop() }) { Text("Stop chain") }
         }
     }
+}
+
+private fun configToText(c: dev.tetherand.app.chain.WireGuardConfig): String {
+    val priv = android.util.Base64.encodeToString(c.privateKey, android.util.Base64.NO_WRAP)
+    val pub  = android.util.Base64.encodeToString(c.peerPublicKey, android.util.Base64.NO_WRAP)
+    val dns  = c.dns.joinToString(", ")
+    val ips  = c.allowedIps.joinToString(", ")
+    return """
+        [Interface]
+        PrivateKey = $priv
+        Address    = ${c.address}
+        DNS        = $dns
+
+        [Peer]
+        PublicKey  = $pub
+        AllowedIPs = $ips
+        Endpoint   = ${c.endpointHost}:${c.endpointPort}
+        PersistentKeepalive = ${c.persistentKeepaliveSecs}
+    """.trimIndent()
 }
 
 @Composable

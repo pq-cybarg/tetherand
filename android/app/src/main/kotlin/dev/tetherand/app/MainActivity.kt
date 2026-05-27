@@ -16,13 +16,14 @@ class MainActivity : ComponentActivity() {
     enum class PendingAction { TETHER, CHAIN }
     private var pending: PendingAction = PendingAction.TETHER
     private var pendingWgConfig: String? = null
+    private var pendingPq: Boolean = false
 
     private val vpnConsent = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { res ->
         if (res.resultCode == Activity.RESULT_OK) when (pending) {
             PendingAction.TETHER -> startTether()
-            PendingAction.CHAIN -> startChain(pendingWgConfig ?: return@registerForActivityResult)
+            PendingAction.CHAIN -> startChain(pendingWgConfig ?: return@registerForActivityResult, pendingPq)
         }
     }
 
@@ -47,11 +48,12 @@ class MainActivity : ComponentActivity() {
         if (p != null) vpnConsent.launch(p) else startTether()
     }
 
-    private fun ensureConsentAndStartChain(wgConfigText: String) {
+    private fun ensureConsentAndStartChain(wgConfigText: String, pqEnabled: Boolean) {
         pending = PendingAction.CHAIN
         pendingWgConfig = wgConfigText
+        pendingPq = pqEnabled
         val p = VpnService.prepare(this)
-        if (p != null) vpnConsent.launch(p) else startChain(wgConfigText)
+        if (p != null) vpnConsent.launch(p) else startChain(wgConfigText, pqEnabled)
     }
 
     private fun startTether() {
@@ -60,9 +62,10 @@ class MainActivity : ComponentActivity() {
     private fun stopTether() {
         TetherandService.stop(this)
     }
-    private fun startChain(wgConfigText: String) {
+    private fun startChain(wgConfigText: String, pqEnabled: Boolean) {
         val i = Intent(this, TetherandChainService::class.java)
             .putExtra(TetherandChainService.EXTRA_WG_CONFIG, wgConfigText)
+            .putExtra(TetherandChainService.EXTRA_PQ_ENABLED, pqEnabled)
         startForegroundService(i)
     }
     private fun stopChain() {

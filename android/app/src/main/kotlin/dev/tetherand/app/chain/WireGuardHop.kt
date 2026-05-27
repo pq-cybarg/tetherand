@@ -123,6 +123,58 @@ class WireGuardHop(
         }
     }
 
+    /**
+     * Replace the underlying BoringTun handle with a new one keyed by [psk].
+     * Triggers a fresh WG handshake on the same UDP socket. Used by the
+     * Mullvad PQ flow after the ML-KEM exchange completes.
+     *
+     * Note (M4 limitation): the encap-side pump (TUN→WG) requires the input
+     * Channel which is held by the orchestrator, not the hop. During rekey
+     * the inbound (UDP→TUN) pump and timer pump restart immediately; the
+     * outbound side resumes when the orchestrator's per-hop input channel
+     * carries fresh packets — which happens automatically as soon as the
+     * app produces more traffic. The visible effect: a 1-2 packet pause
+     * during PQ rekey.
+     */
+    suspend fun rekeyWithPsk(psk: ByteArray) {
+        require(psk.size == 32) { "PSK must be 32 bytes, got ${psk.size}" }
+        jobs.forEach { it.cancel() }
+        jobs.clear()
+        if (handle != 0L) { nativeFree(handle); handle = 0 }
+        handle = nativeNew(
+            config.privateKey,
+            config.peerPublicKey,
+            psk,
+            config.endpointHost,
+            config.endpointPort,
+            config.persistentKeepaliveSecs,
+        )
+        require(handle != 0L) { "native wg rekey init failed" }
+        val out = output ?: throw IllegalStateException("output channel gone")
+        val sock = socket ?: throw IllegalStateException("UDP socket gone")
+        jobs += scope.launch {
+            val buf = ByteArray(2048)
+            val dp = java.net.DatagramPacket(buf, buf.size)
+            while (isActive) {
+                try {
+                    sock.receive(dp)
+                    val frame = buf.copyOfRange(0, dp.length)
+                    handleAction(nativeDecap(handle, frame), out)
+                } catch (e: java.net.SocketTimeoutException) {
+                } catch (e: Throwable) {
+                    if (isActive) android.util.Log.w("WireGuardHop", "udp recv (post-rekey): $e")
+                    break
+                }
+            }
+        }
+        jobs += scope.launch {
+            while (isActive) {
+                kotlinx.coroutines.delay(250)
+                handleAction(nativeUpdateTimers(handle), out)
+            }
+        }
+    }
+
     override suspend fun stop() {
         _state.value = HopState.Stopping
         jobs.forEach { it.cancel() }
