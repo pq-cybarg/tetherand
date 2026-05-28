@@ -8,6 +8,7 @@ members = [
     "core",           # forked Gnirehtet relay-rust (Apache-2.0); handles TCP+TUN userspace stack
     "cli",            # `tetherand` binary; M1 wraps core::relay() + adb forward
     "wg",             # M3: BoringTun WireGuard wrapper + JNI bindings for Android
+    "tor",            # M6: arti-client embedded + bridges + vanguards + JNI for Android
 ]
 
 [workspace.package]

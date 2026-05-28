@@ -1,0 +1,50 @@
+[package]
+name = "tetherand-tor"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Arti is the Rust Tor client. Features:
+#  - tokio: async runtime
+#  - rustls: TLS without OpenSSL (matters for Android cross-compile —
+#    OpenSSL on aarch64-android needs a vendored copy + build.rs flag
+#    dance that rustls sidesteps entirely)
+#  - bridge-client: bridge support
+#  - pt-client: pluggable-transport client framework (M6.x PT crates
+#    will plug into this via Arti's PtManager surface)
+#  - onion-service-client: .onion resolution
+arti-client = { version = "0.27", default-features = false, features = [
+    "tokio", "rustls", "bridge-client", "pt-client", "onion-service-client",
+] }
+tor-rtcompat = { version = "0.27", default-features = false, features = ["tokio", "rustls"] }
+tor-config = "0.27"
+# tor-proto exposes the handshake-selection surface. We don't use it
+# directly from this dep right now — arti-client manages handshake
+# selection — but the dep is wired in so the moment arti releases the
+# PQ-NTor (prop362 / NTor-ML-KEM-v1 hybrid) gate, we can flip it via
+# the lower-level surface without re-wiring the cargo tree.
+tor-proto = "0.27"
+tokio = { version = "1.43", features = ["rt-multi-thread", "macros", "net", "sync", "io-util"] }
+log = "0.4"
+android_logger = { version = "0.14", optional = true }
+jni = "0.21"
+once_cell = "1.20"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2.0"
+
+[features]
+# Android: enables android_logger backend.
+android = ["dep:android_logger"]
+# pq-tor: surface the PQ-NTor (prop362) hybrid handshake preference at
+# the config layer. Arti currently routes prop362 through experimental
+# crates that aren't in the release tree as of arti 0.27; when they
+# land this feature flips the config knob. Until then it's a no-op
+# behaviourally but sets HopCaps.supportsPQ = true on the Kotlin side
+# so users can see the toggle is reserved.
+pq-tor = []
+# Default-on the pq feature — we prefer the PQ handshake whenever
+# upstream supports it.
+default = ["pq-tor"]
