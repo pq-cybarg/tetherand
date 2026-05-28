@@ -64,6 +64,13 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
+    // M10 AI-era defenses — LiteRT (formerly TFLite) for the contributory
+    // classifier layer + WorkManager for the OSINT periodic refresh
+    // through Privacy Chain. NoOp-safe when models are not bundled —
+    // deterministic primaries run with zero dependency on these libs.
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     debugImplementation("androidx.compose.ui:ui-tooling")
