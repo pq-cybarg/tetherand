@@ -12,6 +12,12 @@ data class WireGuardConfig(
     val endpointHost: String,
     val endpointPort: Int,
     val persistentKeepaliveSecs: Int = 0,
+    /** M4f: how the wire packets are obfuscated. Default plain UDP. */
+    val obfuscation: dev.tetherand.app.mullvad.ObfuscationMode = dev.tetherand.app.mullvad.ObfuscationMode.Plain,
+    /** M4f: for SS / udp2tcp / QUIC, the bridge endpoint to dial INSTEAD of (endpointHost, endpointPort). */
+    val obfuscationBridge: dev.tetherand.app.mullvad.ObfuscationBridge? = null,
+    /** M4e: enable DAITA traffic shaping on this hop. */
+    val daita: Boolean = false,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

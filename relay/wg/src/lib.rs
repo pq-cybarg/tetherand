@@ -9,8 +9,12 @@ use boringtun::noise::{Tunn, TunnResult};
 
 pub mod peer;
 pub mod kem;
+pub mod transport;
+pub mod daita;
 pub use peer::{ParseError, WgPeerConfig};
 pub use kem::{KemKeypair, CIPHERTEXT_BYTES, PUBLIC_KEY_BYTES, SHARED_SECRET_BYTES};
+pub use transport::{ObfuscationMode, WgTransport, PlainUdp, UdpOverTcpTransport, ShadowsocksTransport, QuicTransport};
+pub use daita::{DaitaScheduler, PaddingAction};
 
 /// Generate a fresh X25519 keypair (32-byte private, 32-byte public).
 /// Used by the Mullvad device-registration flow on the Kotlin side.
