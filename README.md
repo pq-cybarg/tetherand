@@ -12,7 +12,8 @@ and `docs/superpowers/plans/` for per-milestone implementation plans.
 - **M3** (Privacy Chain core + WireGuard hop via BoringTun JNI): **shipped**.
 - **M4** (Mullvad full stack: classic WG + PQ tunnel ML-KEM-1024 + kill-switch + multihop + DAITA + obfuscation transports + split-tunnel): **shipped**.
 - **M7a** (Threat Detection MVP — 8 heuristics, Room-backed alerts + per-geohash6 baseline, Compose Threat tab, panic button): **shipped**. APK is now GPLv3-converged.
-- **M2, M5, M6, M7b, M7c, M8-M10**: planned. See spec.
+- **M9** (Hardened Mode — one-tap DEFCON profile: pre/post attestation snapshot + frozen app-audit baseline + 6-port honeypot + accelerometer tamper-watcher + 12-item user-action checklist + Acknowledge/Isolate/Evacuate/Burn incident-response runbook + Quick Settings tile): **shipped**.
+- **M2, M5, M6, M7b, M7c, M8, M10**: planned. See spec.
 
 ## Build
 
