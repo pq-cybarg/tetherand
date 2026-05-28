@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -20,6 +21,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
     kotlinOptions { jvmTarget = "21" }
+
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+
+    testOptions {
+        unitTests.all { it.useJUnitPlatform() }
+    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -50,5 +59,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    // M7a threat detection
+    implementation("app.netmonster:core:1.3.0")
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
