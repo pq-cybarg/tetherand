@@ -14,7 +14,8 @@ and `docs/superpowers/plans/` for per-milestone implementation plans.
 - **M7a** (Threat Detection MVP — 8 heuristics, Room-backed alerts + per-geohash6 baseline, Compose Threat tab, panic button): **shipped**. APK is now GPLv3-converged.
 - **M9** (Hardened Mode — one-tap DEFCON profile: pre/post attestation snapshot + frozen app-audit baseline + 6-port honeypot + accelerometer tamper-watcher + 12-item user-action checklist + Acknowledge/Isolate/Evacuate/Burn incident-response runbook + Quick Settings tile): **shipped**.
 - **M10** (AI-era defenses — local-only, contributory: clipboard prompt-injection scrubber, pseudo-perplexity AI-text scorer, phishing-rule message classifier, C2PA/SynthID provenance check, egress-LLM-API SNI watch (18 exact + 10 suffix entries), MTK NPU sysfs watcher, voiceprint-vault safe-word handshake, HIBP OSINT exposure, 8-entry DEFCON-34 field guide, LiteRT runtime scaffold for the 4-model contributory bundle, AI tab UI): **shipped**. Model bundle (~2.4 GB) ships via the M10.x delta-update mechanism — deterministic primaries function fully without it per spec.
-- **M2, M5, M6, M7b, M7c, M8**: planned. See spec.
+- **M6** (Tor + Arti — embedded arti-client 0.27 in `tetherand-tor` Rust crate, BridgeDB-format bridge parser (3/3 tests), vanguards toggle, PQ-NTor (prop362 / NTor-ML-KEM-v1) handshake preference, Privacy tab Tor config card, TorHop wired into the chain orchestrator scaffolding, `scripts/build-tor-android.sh` for NDK cross-compile): **scaffolded**. Pluggable transports (obfs4 / snowflake / meek / webtunnel / conjure), per-flow IP→arti DataStream forwarder, and live Tor-network bootstrap testing ship as M6.x sub-plans.
+- **M2, M5, M7b, M7c, M8**: planned. See spec.
 
 ## Build
 
