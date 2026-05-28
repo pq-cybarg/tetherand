@@ -70,6 +70,18 @@ class TetherandChainService : VpnService() {
             builder.setBlocking(true)
                 .setSession("Tetherand Chain")
                 .allowFamily(android.system.OsConstants.AF_INET)
+            // M4g split-tunnel: exclude user-selected apps from the VPN.
+            // The disallowed-set is persisted in EncryptedSharedPreferences
+            // via SplitTunnelStore. Names that don't resolve to installed
+            // packages are logged and skipped (the apk may have been
+            // uninstalled since the user picked it).
+            val store = dev.tetherand.app.splittunnel.SplitTunnelStore(applicationContext)
+            for (p in store.disallowed()) {
+                try { builder.addDisallowedApplication(p) }
+                catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+                    Log.w(TAG, "split-tunnel: package $p not installed; skipping")
+                }
+            }
             val pfd = builder.establish() ?: return run { Log.e(TAG, "establish() returned null"); stopSelf() }
             this.pfd = pfd
 

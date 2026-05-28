@@ -140,6 +140,17 @@ public class TetherandService extends VpnService {
         builder.setBlocking(true);
         builder.setMtu(MTU);
 
+        // M4g split-tunnel — apply the same disallowed-apps list as the chain
+        // service so policy is consistent across both VpnServices.
+        dev.tetherand.app.splittunnel.SplitTunnelStore store =
+            new dev.tetherand.app.splittunnel.SplitTunnelStore(getApplicationContext());
+        for (String pkg : store.disallowed()) {
+            try { builder.addDisallowedApplication(pkg); }
+            catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                Log.w(TAG, "split-tunnel: package " + pkg + " not installed; skipping");
+            }
+        }
+
         vpnInterface = builder.establish();
         if (vpnInterface == null) {
             Log.w(TAG, "VPN starting failed, please retry");
