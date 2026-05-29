@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Licensing · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="MIT for original work; per-subcomponent licenses retained for forks and ports; GPL-3.0-or-later for the assembled APK.">
+<meta property="og:title" content="Licensing · Tetherand">
+<meta property="og:description" content="MIT for original work; per-subcomponent licenses retained for forks and ports; GPL-3.0-or-later for the assembled APK.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/licensing.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html" class="current">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>Licensing</h1>
+
+<p>Tetherand is a composite project. Different subdirectories ship under different licenses depending on what they fork, port, or link.</p>
+
+<p>The canonical, in-repo licensing map lives at <a href="https://github.com/pq-cybarg/tetherand/blob/main/LICENSE.md"><code>LICENSE.md</code></a>. This page summarises it.</p>
+
+<h2 id="headline">Headline</h2>
+
+<ul class="checklist">
+  <li><strong>Original work in this repository</strong> &mdash; code, scripts, configuration, and documentation written for Tetherand &mdash; is licensed under the <a href="https://github.com/pq-cybarg/tetherand/blob/main/LICENSE">MIT License</a>.</li>
+  <li><strong>Forked, ported, and vendored code</strong> keeps its upstream license. Per-subdirectory <code>NOTICE</code> files document specific upstream origins.</li>
+  <li><strong>The assembled APK and the host-side <code>tetherand</code> binary</strong> are governed by <strong>GPL-3.0-or-later</strong> in aggregate, because GPL-3.0 ports are linked into them.</li>
+</ul>
+
+<h2 id="reuse">Reusing the MIT-licensed parts</h2>
+
+<p>If you want to extract just our original work &mdash; the build scripts, the documentation, the deterministic AI Guard heuristics in isolation, the bundle-combination tool, the hash-sidecar tool, the macOS LaunchAgent, the hardened-mode orchestrator &mdash; MIT terms apply.</p>
+
+<p>You can do this freely without GPL-3.0 obligations attaching, <strong>as long as you don't redistribute the assembled APK or binary</strong>, because those are aggregations that include GPL-3.0 code.</p>
+
+<h2 id="thin">Building a thin "MIT-only" APK</h2>
+
+<p>It is technically possible to produce an APK that ships under MIT-compatible terms only, by omitting:</p>
+
+<ul>
+  <li>The Mullvad client libraries (drops M4).</li>
+  <li>The threat-detection module that ports AIMSICD, SnoopSnitch, NetMonster, and Crocodile Hunter (drops M7a).</li>
+</ul>
+
+<p>The resulting APK loses the privacy-chain Mullvad option and the cellular threat detection. The rest of the app continues to function. This is not a supported build target &mdash; you'd need to patch <code>android/app/build.gradle.kts</code> and remove the relevant Kotlin packages from the source set yourself.</p>
+
+<h2 id="map">Subcomponent licenses at a glance</h2>
+
+<table>
+  <tr><th>Component</th><th>License</th></tr>
+  <tr><td>Tetherand original work</td><td><span class="badge ok">MIT</span></td></tr>
+  <tr><td>Gnirehtet relay-rust fork (M1)</td><td>Apache-2.0</td></tr>
+  <tr><td>BoringTun WireGuard userspace (M3)</td><td>BSD-3-Clause</td></tr>
+  <tr><td>Mullvad client libraries (M4)</td><td><span class="badge warn">GPL-3.0-or-later</span></td></tr>
+  <tr><td>nym-sdk (M5, opt-in)</td><td>Apache-2.0 with some GPL-3.0 modules</td></tr>
+  <tr><td>Arti and tor-* family (M6)</td><td>MIT OR Apache-2.0</td></tr>
+  <tr><td>obfs4 / meek / webtunnel implementations (M6.x)</td><td>MIT (clean-room)</td></tr>
+  <tr><td>Conjure / gotapdance client (M6.x)</td><td>Apache-2.0</td></tr>
+  <tr><td>Threat-detection ports (M7a)</td><td><span class="badge warn">GPL-3.0-or-later</span></td></tr>
+  <tr><td>librtlsdr, libhackrf (M7b)</td><td>GPL-2.0-or-later</td></tr>
+  <tr><td>libusb (M7b)</td><td>LGPL-2.1-or-later</td></tr>
+  <tr><td>TensorFlow Lite / LiteRT (M10 runtime)</td><td>Apache-2.0</td></tr>
+  <tr><td>AndroidX libraries</td><td>Apache-2.0</td></tr>
+</table>
+
+<h2 id="aggregation">Notes on the GPL aggregation boundary</h2>
+
+<p>Several spec milestones (M3, M5, M6, M6.x, M9, M10) carry MIT or Apache-2.0 source on their own, but get linked into a single APK alongside GPL-3.0 ports (M4, M7a). Under GPL-3.0 the <strong>combined work</strong> falls under GPL-3.0-or-later for distribution purposes, even though the individual files remain under their declared licenses for the purposes of reuse and reattribution.</p>
+
+<p>In practical terms:</p>
+
+<ul>
+  <li><strong>You can freely extract and reuse</strong> any MIT-licensed file from this repo without GPL obligations attaching. The MIT terms travel with the file.</li>
+  <li><strong>You cannot redistribute the assembled APK</strong> under MIT-only terms once M4 or M7a are included &mdash; the GPL-3.0 sources demand GPL-3.0 redistribution of the whole binary.</li>
+  <li><strong>You can build a "thin" APK</strong> that omits M4 and M7a entirely (drop the relevant native libraries from <code>jniLibs/</code> and the Mullvad and threat-detection Kotlin packages from the build inputs); that variant can ship under MIT terms.</li>
+</ul>
+
+<p>This is identical to how many composite Android projects handle license-blending; it follows the FSF's published guidance on aggregation versus combination.</p>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

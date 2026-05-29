@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Roadmap · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Per-milestone status, scope, and what's deferred to a sub-release.">
+<meta property="og:title" content="Roadmap · Tetherand">
+<meta property="og:description" content="Per-milestone status, scope, and what's deferred to a sub-release.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/roadmap.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html" class="current">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>Roadmap</h1>
+
+<p>Every milestone in the design spec is source-complete in v0.1. Below is the per-milestone status, scope, and what (if anything) is deferred to a sub-release.</p>
+
+<h2 id="shipped">Shipped milestones</h2>
+
+<table>
+  <tr><th>Milestone</th><th>Status</th><th>Scope</th></tr>
+
+  <tr>
+    <td><strong>M0</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>DEFCON pre-flight playbook plus the scripts <code>connect.sh</code>, <code>backup.sh</code>, <code>restore.sh</code>, <code>scripts/defcon-prep.sh</code>, <code>tutorial.sh</code>. The playbook lives at <code>./tutorial.sh</code>, served on <code>http://localhost:7331/</code>.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M1</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>Tether MVP &mdash; forked Gnirehtet relay-core, custom-branded APK, USB-ADB and LAN-TCP transports, Compose Tether tab, <code>tetherand run</code> CLI.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M2</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>Bluetooth-RFCOMM + USB-AOA transports, ratatui dashboard at <code>tetherand tui</code>, macOS LaunchAgent auto-starting on Seeker attach via IOKit polling.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M3</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>Privacy-chain core &mdash; hop trait, chain orchestrator, WireGuard hop via BoringTun JNI, Privacy tab visualiser.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M4</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>Mullvad full stack &mdash; classic WG, post-quantum tunnel (ML-KEM-1024), AF_INET-only kill-switch, multihop, DAITA traffic shaping, obfuscation transports (UDP-over-TCP, Shadowsocks, QUIC), app-level split-tunnel.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M5</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>NymVPN mixnet hop &mdash; nym-sdk gated behind <code>with-sdk</code> feature, JNI surface, Sphinx 3-hop entry/exit, mnemonic-paid bandwidth.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M6</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>Tor via embedded Arti &mdash; bridges (BridgeDB-format parser, 3/3 tests), vanguards toggle, prop362 NTor-ML-KEM-v1 handshake preference, Privacy tab Tor config card.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M6.x</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>Pluggable transports &mdash; obfs4 + meek + webtunnel inline in <code>tetherand-pt</code> (ntor handshake, ChaCha20-Poly1305 AEAD frames, HTTPS POST tunneling, WS upgrade); arti managed-PT wiring; <code>TorFlowForwarder</code> per-flow IP&rarr;arti DataStream forwarder; <code>PtBinaryStager</code>; cross-compile scripts for snowflake-client + conjure-client; live-probe integration tests.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M7a</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>Threat-detection MVP &mdash; NetMonster Tier 0 + AIMSICD <code>BTSAlgorithm</code> + SnoopSnitch RAT-downgrade + Crocodile Hunter (TAC / EARFCN / re-attach-storm) + Wi-Fi evil-twin + BLE tracker fingerprints + app-audit + per-geohash6 baseline + Threat tab + panic button.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M7b</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>SDR detection &mdash; <code>SdrDetector</code> scans for RTL-SDR, HackRF One, Nuand bladeRF, LimeSDR variants over USB-OTG; <code>SdrSection</code> threat-tab card; <code>scripts/build-rtlsdr-android.sh</code> cross-compiles libusb + librtlsdr + libhackrf.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M7c</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>Root-tier MediaTek modem readers &mdash; <code>RootCheck</code> 3-signal vote; <code>CcciMd1Reader</code> for <code>/proc/ccci_md1_status</code> + <code>_ic_intr</code>; <code>MdlogParser</code>; <code>AtCommandChannel</code> over <code>/dev/ttyMT0</code>; <code>RootSection</code>. Dormant on un-rooted devices.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M8</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>Release polish &mdash; <code>make native-all</code>, <code>make release-signed</code> with DN allow-list gate, <code>make smoke-device</code>, <code>make hashes</code> + <code>scripts/hash-artifacts.sh</code> + <code>scripts/bundle-combinations.sh</code>, macOS LaunchAgent.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M9</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>Hardened Mode &mdash; one-tap DEFCON profile, pre/post attestation snapshot, frozen app-audit baseline, six-port honeypot, accelerometer tamper-watcher, twelve-item user-action checklist, Acknowledge/Isolate/Evacuate/Burn incident-response runbook, Quick Settings tile.</td>
+  </tr>
+
+  <tr>
+    <td><strong>M10</strong></td>
+    <td><span class="badge ok">shipped</span></td>
+    <td>AI-era defenses &mdash; deterministic primaries (perplexity scoring, phishing rule, prompt-injection clipboard scrubber, C2PA/SynthID provenance, egress-LLM-API watch, NPU sysfs watcher, voiceprint vault, OSINT exposure) plus LiteRT runtime scaffold for the four-model contributory bundle. <strong>Hard constraint:</strong> no cloud LLM API ever called.</td>
+  </tr>
+</table>
+
+<h2 id="deferred">Deferred to follow-up releases</h2>
+
+<table>
+  <tr><th>Item</th><th>Why</th></tr>
+  <tr>
+    <td>Snowflake pluggable transport binary</td>
+    <td>Upstream <code>github.com/wlynxg/anet</code> uses a Go internal symbol removed in Go 1.26. Awaiting an upstream fix.</td>
+  </tr>
+  <tr>
+    <td>LTE control-channel decoder (SIB/MIB parser) on the SDR path</td>
+    <td>The JNI hook ships in v0.1; the actual decode logic is sized for a sub-release. Plug in an RTL-SDR or HackRF One; <code>SdrSection</code> in the Threat tab confirms detection.</td>
+  </tr>
+  <tr>
+    <td>Four-model on-device AI bundle (~2.4 GB)</td>
+    <td>Delivered through the in-app delta-update path so v0.1's APK stays at ~59 MB. The deterministic primaries function fully without it per spec.</td>
+  </tr>
+  <tr>
+    <td>Hardened Mode extras</td>
+    <td>Front-camera selfie-on-failed-unlock, ultrasonic-beacon microphone listener, decoy profile, dead-man's switch, Seed Vault freeze. Each is independently scoped for a sub-release.</td>
+  </tr>
+</table>
+
+<h2 id="post">Post-DEFCON intentions</h2>
+
+<ul>
+  <li>An iOS port of the deterministic-AI Guard primaries (no NPU dependency, just the rules).</li>
+  <li>A standalone macOS / Linux command-line AI Guard mode that watches a local clipboard + downloaded files.</li>
+  <li>A Privacy tab visualiser that renders the active chain as an interactive network diagram with live latency / throughput annotations.</li>
+  <li>A Hardened Mode "dead-man's switch" that requires an interaction every N hours, or it auto-wipes.</li>
+</ul>
+
+<p>None of these are scoped or scheduled. They are intentions, not commitments.</p>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

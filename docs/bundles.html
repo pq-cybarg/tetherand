@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bundle combinations · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Tetherand ships every subset of the six native-library groups as its own zip with paired SHA-256 + SHA3-256 sidecars.">
+<meta property="og:title" content="Bundle combinations · Tetherand">
+<meta property="og:description" content="Tetherand ships every subset of the six native-library groups as its own zip with paired SHA-256 + SHA3-256 sidecars.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/bundles.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html" class="current">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>Bundle combinations</h1>
+
+<p>The native libraries that power Tetherand's hops are grouped into six independent bundles. Each release includes every possible combination of these bundles as its own zip file, with paired SHA-256 + SHA3-256 sidecars, so users can pick the slimmest bundle that gives them what they want.</p>
+
+<h2 id="groups">The six groups</h2>
+
+<table>
+  <tr><th>Group</th><th>Contents</th><th>Approximate size</th></tr>
+  <tr><td><code>wg</code></td><td><code>libtetherand_wg.so</code> (WireGuard via BoringTun)</td><td>~2.7 MB</td></tr>
+  <tr><td><code>tor</code></td><td><code>libtetherand_tor.so</code> (embedded Arti)</td><td>~9.0 MB</td></tr>
+  <tr><td><code>nym</code></td><td><code>libtetherand_nym.so</code> (Nym mixnet JNI surface)</td><td>~600 KB</td></tr>
+  <tr><td><code>pt</code></td><td><code>libtetherand_pt.so</code> (obfs4 + meek + webtunnel inline)</td><td>~2.7 MB</td></tr>
+  <tr><td><code>pts</code></td><td><code>libconjure_client.so</code> (and snowflake once upstream catches up)</td><td>~16 MB</td></tr>
+  <tr><td><code>sdr</code></td><td><code>librtlsdr.so</code> + <code>libhackrf.so</code> + <code>libusb1.0.so</code></td><td>~1.0 MB</td></tr>
+</table>
+
+<p>Six independent groups means 2<sup>6</sup> = <strong>64 combinations</strong> including the empty one.</p>
+
+<h2 id="naming">Naming</h2>
+
+<p>Each combination zip is named with its group codes sorted alphabetically and joined with <code>+</code>:</p>
+
+<pre><code>tetherand-libs-none.zip                       # empty (manifest only)
+tetherand-libs-wg.zip                         # WG only
+tetherand-libs-tor+wg.zip                     # WG + Tor
+tetherand-libs-nym+pt+pts+sdr+tor+wg.zip      # everything</code></pre>
+
+<h2 id="contents">What's inside a zip</h2>
+
+<pre><code>$ unzip -l tetherand-libs-tor+wg.zip
+Archive:  tetherand-libs-tor+wg.zip
+        Length      Date    Time    Name
+        --------- ---------- -----   ----
+              420  01-01-2026 00:00   MANIFEST.txt
+          2677840  01-01-2026 00:00   lib/arm64-v8a/libtetherand_pt.so
+          9472040  01-01-2026 00:00   lib/arm64-v8a/libtetherand_tor.so</code></pre>
+
+<p>The <code>MANIFEST.txt</code> lists which groups are present, the on-device target path (<code>lib/arm64-v8a/&lt;file&gt;</code>), and per-file SHA-256 hashes. Each zip also has its own <code>.sha256</code> and <code>.sha3-256</code> sidecar files covering the zip as a whole.</p>
+
+<h2 id="picking">Picking the right bundle</h2>
+
+<p>Use the smallest bundle that contains every hop you intend to configure. As a rough guide:</p>
+
+<ul>
+  <li><strong>Just want to reverse-tether and use WireGuard</strong> &mdash; <code>wg</code>.</li>
+  <li><strong>Plus Tor (with bundled obfs4/meek/webtunnel bridges)</strong> &mdash; <code>wg+tor+pt</code>.</li>
+  <li><strong>Plus snowflake/conjure pluggable transports</strong> &mdash; <code>wg+tor+pt+pts</code>.</li>
+  <li><strong>Plus the Nym mixnet</strong> &mdash; <code>nym+pt+pts+tor+wg</code>.</li>
+  <li><strong>Plus SDR detection</strong> &mdash; <code>nym+pt+pts+sdr+tor+wg</code>.</li>
+  <li><strong>Verification-of-absence artefact only</strong> &mdash; <code>none</code>.</li>
+</ul>
+
+<p>The empty bundle (<code>tetherand-libs-none.zip</code>) is included so a verifier can prove that a given hash corresponds to an explicit "this contains nothing" state. Useful for build reproducibility checks where the verifier wants to confirm the bundle script's behaviour on edge cases.</p>
+
+<h2 id="master-index">Master index</h2>
+
+<p><code>dist/bundles/COMBOSUMS.txt</code> lists every combination zip with both its SHA-256 and SHA3-256:</p>
+
+<pre><code>SHA256     &lt;hex&gt;  tetherand-libs-none.zip
+SHA3-256   &lt;hex&gt;  tetherand-libs-none.zip
+SHA256     &lt;hex&gt;  tetherand-libs-wg.zip
+SHA3-256   &lt;hex&gt;  tetherand-libs-wg.zip
+&hellip;</code></pre>
+
+<p>Use this for batch verification &mdash; <code>awk</code> + <code>shasum -a 256 -c</code> to walk the whole list.</p>
+
+<h2 id="installing">Installing a custom bundle</h2>
+
+<p>To use a bundle other than the full one, take the empty APK from a custom build (<code>make apk</code> after deleting unwanted <code>.so</code> files from <code>android/app/src/main/jniLibs/arm64-v8a/</code>) and extract the chosen combination zip into the same <code>lib/arm64-v8a/</code> directory:</p>
+
+<pre><code>unzip -o tetherand-libs-tor+wg.zip -d android/app/src/main/jniLibs/
+make apk</code></pre>
+
+<p>This regenerates the APK with the desired native libraries and emits fresh hash sidecars covering the new contents.</p>
+
+<h2 id="why">Why so many combinations</h2>
+
+<p>Each native library has independent integrity properties: a compromised <code>libtetherand_tor.so</code> doesn't tell you anything about the state of <code>libtetherand_nym.so</code>. Publishing all combinations means a user who only wants Tor can verify against the <code>wg+tor+pt</code> combo and not be exposed to a hypothetical issue in Nym or SDR libraries they don't plan to use. The "all combinations" approach defends against trojaned-library substitution attacks under a different threat model than the unified APK does.</p>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hardened Mode · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="One-tap DEFCON lockdown: attestation snapshot, honeypot, tamper-watch, four-button incident-response runbook.">
+<meta property="og:title" content="Hardened Mode · Tetherand">
+<meta property="og:description" content="One-tap DEFCON lockdown: attestation snapshot, honeypot, tamper-watch, four-button incident-response runbook.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/hardened-mode.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html" class="current">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>Hardened Mode</h1>
+
+<p>Hardened Mode is the one-tap DEFCON lockdown profile. When engaged, it puts the Seeker into a posture suitable for spending several days inside a hostile cellular and Wi-Fi environment.</p>
+
+<h2 id="enter">What it does on enter</h2>
+
+<p>Tapping the master switch on the Threat tab triggers, in order:</p>
+
+<ol>
+  <li><strong>Pre-event attestation snapshot.</strong> Captures a JSON of the build fingerprint, every installed package's signing certificate hash, every device-admin and accessibility service in use, and the system + user CA store contents. Stored encrypted on the device.</li>
+  <li><strong>App-audit baseline freeze.</strong> Records the current set of trusted apps. Any new app installed while Hardened Mode is on triggers a high-severity alert.</li>
+  <li><strong>Six-port honeypot.</strong> Binds 8080, 8443, 8000, 9000, 1080, and 3128 on the loopback and LAN interfaces. Any inbound connection attempt is logged as a high-severity alert. Conference Wall-of-Sheep teams and Wi-Fi Pineapples reliably probe these ports.</li>
+  <li><strong>Accelerometer tamper-watcher.</strong> After five minutes of stillness, the watcher arms. Any subsequent burst above 1.5&nbsp;m/s&sup2; fires a critical alert. Catches "evil maid" attacks where someone picks up an unattended phone in a hotel room.</li>
+  <li><strong>Clipboard scrubber.</strong> Watches every clipboard change for known prompt-injection scaffolds ("ignore previous instructions", chat-template markers, common jailbreak prefixes). Surfaces hits as a high-severity alert. Does <strong>not</strong> auto-clear the clipboard; the user gets a banner and a button.</li>
+</ol>
+
+<h2 id="checklist">User-action checklist</h2>
+
+<p>A twelve-item checklist appears in the same card. Items that Tetherand can't toggle without device-owner / root are surfaced as amber-tinted prompts the user actions in system Settings:</p>
+
+<ul class="checklist">
+  <li>VPN always-on with block-without-VPN</li>
+  <li>NFC disabled</li>
+  <li>Bluetooth disabled (allowlist excepted)</li>
+  <li>SIM PIN required</li>
+  <li>All saved Wi-Fi forgotten</li>
+  <li>Force LTE-only (no 2G/3G)</li>
+  <li>Biometrics disabled (PIN only)</li>
+  <li>Android Lockdown Mode active</li>
+  <li>USB-C data lockdown</li>
+  <li>Notification preview hidden on lock screen</li>
+  <li>Find-my-device disabled</li>
+  <li>App-pairing receipts cleared</li>
+</ul>
+
+<p>Each row shows a green dot when the underlying setting is in the desired state and amber otherwise.</p>
+
+<h2 id="exit">What it does on exit</h2>
+
+<p>Toggling Hardened Mode off captures a second attestation snapshot and shows the diff against the pre-event one &mdash; package additions and removals, signing-certificate changes, new device admins, new accessibility services, new CAs in the user trust store. This is the "did anything tamper with my phone over the weekend" check.</p>
+
+<h2 id="incident-response">Incident response</h2>
+
+<p>The runbook lives next to the master switch as a card with four buttons. Each runs a deterministic action:</p>
+
+<table>
+  <tr><th>Button</th><th>Behaviour</th></tr>
+  <tr>
+    <td><strong>Acknowledge</strong></td>
+    <td>Logs the decision and continues. Use for low-confidence alerts you've decided to ignore.</td>
+  </tr>
+  <tr>
+    <td><strong>Isolate</strong></td>
+    <td>Opens the Android Airplane-mode settings shortcut. Stops using the phone for sensitive operations.</td>
+  </tr>
+  <tr>
+    <td><strong>Evacuate</strong></td>
+    <td>Confirms the pre-snapshot is preserved and reminds you to plug into your laptop to run <code>./backup.sh</code> before continuing.</td>
+  </tr>
+  <tr>
+    <td><strong>Burn</strong></td>
+    <td>Two-tap confirmation. Opens the Privacy Settings shortcut at the Reset &gt; Factory data reset path. Tetherand is not a device owner so it cannot wipe directly &mdash; this routes you to the system reset flow.</td>
+  </tr>
+</table>
+
+<h2 id="tile">Quick Settings tile</h2>
+
+<p>Hardened Mode also exposes a Quick Settings tile labelled <strong>DEFCON Mode</strong>. Pull down the notification shade twice, edit the tile list, and drag the tile into your active row. Tapping it from the shade has the same effect as the master switch on the Threat tab.</p>
+
+<h2 id="tradeoffs">Trade-offs</h2>
+
+<p>Hardened Mode is aggressive enough that some legitimate apps will behave oddly:</p>
+
+<ul>
+  <li>The honeypot binds ports that Android does not consider "in use", so other apps trying to bind the same ports will hit a bind-failure. Most apps recover gracefully.</li>
+  <li>The tamper-watcher will fire if someone picks up your phone &mdash; which is exactly the point &mdash; but it means leaving the phone in your pocket and moving around will not trigger it (motion before arming).</li>
+  <li>The clipboard scrubber prints a logcat warning every time the clipboard changes, which can be noisy if you copy-paste frequently during the conference.</li>
+</ul>
+
+<p>You can leave Hardened Mode engaged through normal use; it does not disable the privacy chain or the tether. It only adds defenses on top.</p>
+
+<div class="callout warn">
+  Hardened Mode does not wipe data on its own. The Burn button surfaces the system reset shortcut but waits for your confirmation. Decide your wipe policy <em>before</em> the conference, not during a crisis.
+</div>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

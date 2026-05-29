@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Privacy chain · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Compose a chain of WireGuard, Mullvad PQ, NymVPN, and Tor hops between your traffic and the internet.">
+<meta property="og:title" content="Privacy chain · Tetherand">
+<meta property="og:description" content="Compose a chain of WireGuard, Mullvad PQ, NymVPN, and Tor hops between your traffic and the internet.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/privacy-chain.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html" class="current">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>Privacy chain</h1>
+
+<p>The Privacy tab lets you compose a sequence of hops between the phone's traffic and the internet. Each hop is independently configured. They can be combined arbitrarily &mdash; for example, you can chain Mullvad through Tor through Nym for maximum unlinkability, at the cost of speed.</p>
+
+<h2 id="hops">Hop types</h2>
+
+<table>
+  <tr><th>Hop</th><th>What it does</th><th>Strengths</th><th>Tradeoffs</th></tr>
+  <tr>
+    <td><strong>WireGuard</strong></td>
+    <td>Generic WG endpoint via BoringTun</td>
+    <td>Fast, lightweight, standard</td>
+    <td>Single point of trust in whatever endpoint you point at</td>
+  </tr>
+  <tr>
+    <td><strong>Mullvad</strong></td>
+    <td>WireGuard configured against Mullvad's relay network</td>
+    <td>Optional post-quantum tunnel (ML-KEM-1024), DAITA traffic shaping, multihop, app-level split-tunnel</td>
+    <td>Needs a Mullvad subscription</td>
+  </tr>
+  <tr>
+    <td><strong>NymVPN</strong></td>
+    <td>Sphinx-format three-hop mixnet</td>
+    <td>Breaks address-association (entry node and exit node don't share state); resists traffic analysis</td>
+    <td>Higher latency; needs zk-nym mnemonic for paid bandwidth</td>
+  </tr>
+  <tr>
+    <td><strong>Tor</strong></td>
+    <td>Embedded Arti client with bridge support and vanguards</td>
+    <td>Anti-censorship, .onion routing, pluggable transports</td>
+    <td>TCP only; some sites block exit nodes</td>
+  </tr>
+</table>
+
+<h2 id="wg">WireGuard hop</h2>
+
+<p>Paste a standard <code>[Interface]</code> / <code>[Peer]</code> configuration block. Any config a normal WireGuard client accepts works here.</p>
+
+<pre><code>[Interface]
+PrivateKey = &lt;base64&gt;
+Address    = 10.66.0.2/32
+DNS        = 1.1.1.1
+
+[Peer]
+PublicKey  = &lt;base64&gt;
+Endpoint   = endpoint.example:51820
+AllowedIPs = 0.0.0.0/0
+PersistentKeepalive = 25</code></pre>
+
+<h2 id="mullvad">Mullvad hop</h2>
+
+<p>Enter your sixteen-digit Mullvad account number, tap <strong>Fetch servers</strong>, pick an entry server, then choose the extras you want.</p>
+
+<h3>Post-quantum tunnel</h3>
+<p>Uses Mullvad's ML-KEM-1024 quantum-resistant key exchange layered on top of the standard WireGuard handshake. The negotiation establishes a PQ shared secret that gets mixed into the WG session key as a pre-shared key. The end-to-end tunnel survives a "harvest-now, decrypt-later" attack against the WG curve25519 handshake, because the session key requires both the curve25519 secret and the ML-KEM secret.</p>
+
+<h3>Multihop</h3>
+<p>Adds a separate exit server. Traffic enters via the entry server and emerges from the exit server. Implemented via Mullvad's <code>multihop_port</code> spec: the entry server tunnels everything to a fixed UDP port on the exit server, which then de-encapsulates and forwards to the destination. The exit server sees only the entry server's IP, not yours.</p>
+
+<h3>DAITA</h3>
+<p>Defense Against AI-guided Traffic Analysis. Reshapes packet timing and sizes via the <a href="https://github.com/mullvad/maybenot">maybenot</a> framework to defeat machine-learning-based traffic classifiers (website-fingerprinting attacks, in particular).</p>
+
+<h3>Obfuscation transport</h3>
+<p>Wrap the WireGuard tunnel in one of three transport disguises:</p>
+<ul>
+  <li><strong>UDP-over-TCP</strong> &mdash; length-prefixed framing. Disguises the WG UDP traffic as a TCP stream so it passes through firewalls that block all UDP.</li>
+  <li><strong>Shadowsocks</strong> &mdash; TCP transport with AEAD encryption (ChaCha20-Poly1305 or AES-GCM). Looks like generic encrypted TCP to a network observer.</li>
+  <li><strong>QUIC</strong> &mdash; QUIC over UDP/443, indistinguishable from HTTPS/3 traffic on the wire.</li>
+</ul>
+
+<h3>Exclude apps from VPN</h3>
+<p>Opens a picker for app-level split-tunnel. Selected apps bypass the VPN entirely. Useful for apps that misbehave behind a VPN (banking apps that geo-fence on IP, captive-portal browsers).</p>
+
+<h2 id="nym">NymVPN hop</h2>
+
+<p>The mixnet uses zk-nym credentials paid in NYM tokens for the bandwidth. To configure:</p>
+<ol>
+  <li>Generate or import a wallet mnemonic at <a href="https://nymtech.net">nymtech.net</a>.</li>
+  <li>Paste it into the mnemonic field on the Privacy tab.</li>
+  <li>Optionally pin a specific entry and exit gateway by ID. If left blank, the SDK picks defaults from the topology.</li>
+</ol>
+<p>Without a mnemonic the SDK falls back to testnet credentials, which is fine for testing but not for real use.</p>
+
+<h3>Sphinx</h3>
+<p>Each outgoing packet is wrapped in three layers of encryption, one per hop between entry gateway and exit gateway. Each mixnode peels off one layer and forwards. The mixnodes also add random padding and timing jitter, so an observer watching the wire cannot link a packet entering the network to one leaving it. This is structurally different from VPN-only hops (WG, Mullvad, Tor) which can be defeated by an adversary watching <em>both</em> sides of the tunnel.</p>
+
+<h2 id="tor">Tor hop</h2>
+
+<p>Paste BridgeDB-format bridge lines into the bridges field, one per line. Plain vanilla bridges (no <code>obfs4</code>/<code>meek</code>/etc prefix) work without any extra setup. Pluggable transports need the corresponding binary bundled in the APK:</p>
+
+<table>
+  <tr><th>Transport</th><th>How</th><th>Status</th></tr>
+  <tr><td><code>obfs4</code></td><td>Inline implementation in <code>libtetherand_pt.so</code></td><td><span class="badge ok">bundled</span></td></tr>
+  <tr><td><code>meek</code></td><td>Inline (HTTPS POST tunneling)</td><td><span class="badge ok">bundled</span></td></tr>
+  <tr><td><code>webtunnel</code></td><td>Inline (HTTPS WS upgrade)</td><td><span class="badge ok">bundled</span></td></tr>
+  <tr><td><code>conjure</code></td><td>Upstream gotapdance binary</td><td><span class="badge ok">bundled</span></td></tr>
+  <tr><td><code>snowflake</code></td><td>Upstream Go binary</td><td><span class="badge warn">v0.x &mdash; awaiting Go 1.26 fix</span></td></tr>
+</table>
+
+<h3>Vanguards</h3>
+<p>Engages Tor's anti-Sybil entry-guard hardening. The vanguards layer randomises path-selection in ways that make it much harder for an attacker who runs many relays to end up on both ends of any user's circuit.</p>
+
+<h3>Prefer PQ-NTor handshake</h3>
+<p>Wires the prop362 / NTor-ML-KEM-v1 hybrid handshake preference. The setting is in place; the actual on-the-wire engagement lights up automatically once upstream Arti exposes the cipher-suite knob in a release crate. Until then it is a no-op flag held in the config.</p>
+
+<h2 id="chaining">Chaining hops</h2>
+
+<p>The chain orchestrator processes hops in the order they are enabled. A typical paranoid stack for DEFCON might be:</p>
+
+<pre><code>Apps → Tetherand TUN → Tor → Mullvad PQ → Internet</code></pre>
+
+<p>Each hop adds latency. Measure with the small ping/throughput counter at the top of the Privacy tab and trim hops you don't need. Two practical defaults:</p>
+
+<table>
+  <tr><th>Profile</th><th>Chain</th><th>When</th></tr>
+  <tr><td><strong>Speed</strong></td><td><code>WireGuard</code> only</td><td>You're at a trusted venue and just want to bypass a captive portal</td></tr>
+  <tr><td><strong>Conference</strong></td><td><code>Mullvad PQ + DAITA</code></td><td>Working in a hostile cellular environment; want PQ + traffic-analysis defense without Tor's latency</td></tr>
+  <tr><td><strong>Sensitive</strong></td><td><code>Tor</code> via <code>Mullvad PQ + DAITA</code></td><td>Anything where attribution matters</td></tr>
+  <tr><td><strong>Maximum</strong></td><td><code>Tor</code> via <code>Nym</code> via <code>Mullvad PQ + DAITA</code></td><td>You want every layer the app offers, latency be damned</td></tr>
+</table>
+
+<h2 id="posture">Privacy posture (hard rules)</h2>
+
+<p>Non-negotiable:</p>
+<ul class="checklist">
+  <li>No telemetry. Tetherand never phones home.</li>
+  <li>Model and bridge updates flow only through whatever chain is currently active. There is no out-of-band update path.</li>
+  <li>DNS goes through the last enabled hop. No host-resolver leaks.</li>
+</ul>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Verifying downloads · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Every Tetherand release artefact ships with paired SHA-256 + SHA3-256 sidecars.">
+<meta property="og:title" content="Verifying downloads · Tetherand">
+<meta property="og:description" content="Every Tetherand release artefact ships with paired SHA-256 + SHA3-256 sidecars.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/verifying.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html" class="current">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>Verifying downloads</h1>
+
+<p>Every Tetherand release artefact ships with <strong>two</strong> sidecar hash files computed by independent cryptographic constructions. To trust an artefact, both must match what's published on the <a href="https://github.com/pq-cybarg/tetherand/releases">release page</a>.</p>
+
+<h2 id="why-two">Why two hashes</h2>
+
+<p>A single hash function is only as strong as the cryptographic family it belongs to. Even though no general collision attack is known against SHA-256 today, the value of the artefacts being signed makes them a worthwhile target. By also publishing a hash from a fundamentally different construction, an attacker who wants to substitute a malicious binary needs <strong>two</strong> independent collisions simultaneously &mdash; a problem with no known general method.</p>
+
+<table>
+  <tr><th>Function</th><th>Construction</th><th>Used by</th></tr>
+  <tr><td><code>SHA-256</code></td><td>Merkle&ndash;Damg&aring;rd chain over a Davies&ndash;Meyer compression function</td><td>The wider Internet (TLS certs, Bitcoin, git blob hashing, &hellip;)</td></tr>
+  <tr><td><code>SHA3-256</code></td><td>Keccak sponge permutation</td><td>NIST FIPS 202, post-Merkle&ndash;Damg&aring;rd designs</td></tr>
+</table>
+
+<p>The two are deliberately unrelated. A collision attack on the Merkle&ndash;Damg&aring;rd family (the Marc Stevens / SHAttered class of work) tells you nothing about a sponge construction's collision resistance. A multi-hash forge is a different cryptanalysis problem than a single-hash forge.</p>
+
+<h2 id="commands">The two commands</h2>
+
+<pre><code>shasum -a 256 &lt;file&gt;           # must match the .sha256 sidecar
+openssl dgst -sha3-256 &lt;file&gt;  # must match the .sha3-256 sidecar</code></pre>
+
+<p>Both should print a hex hash on stdout. Compare each to the corresponding sidecar file from the release page.</p>
+
+<p>On macOS, <code>shasum</code> ships with the base system; <code>openssl</code> 3.x (which has SHA3-256) is Homebrew's by default (<code>brew install openssl</code>). On Linux, <code>sha256sum</code> and <code>openssl</code> are both standard.</p>
+
+<h2 id="walkthrough">Worked example</h2>
+
+<p>After downloading <code>tetherand.apk</code>, <code>tetherand.apk.sha256</code>, and <code>tetherand.apk.sha3-256</code> from the release page:</p>
+
+<pre><code>$ shasum -a 256 tetherand.apk
+075ef70425f1d3544bfba9cea7b2c77cbbb438b52c4014c4f0056494d91899b7  tetherand.apk
+
+$ cat tetherand.apk.sha256
+075ef70425f1d3544bfba9cea7b2c77cbbb438b52c4014c4f0056494d91899b7  tetherand.apk</code></pre>
+
+<p>Same hex string &mdash; first check passes. Now the SHA3-256 check:</p>
+
+<pre><code>$ openssl dgst -sha3-256 tetherand.apk
+SHA3-256(tetherand.apk)= fb2452227d975d79fdd1200c57e45b955c1caf932ab799288f7a86f2119d9157
+
+$ cat tetherand.apk.sha3-256
+fb2452227d975d79fdd1200c57e45b955c1caf932ab799288f7a86f2119d9157  tetherand.apk</code></pre>
+
+<p>Second check passes. The artefact is safe to install.</p>
+
+<div class="callout danger">
+  If either check fails, <strong>do not install the artefact.</strong> Re-download from the release page over a different network if possible. If a re-download from a different network still gives mismatched hashes, the artefact has been replaced upstream and should be reported as a security issue.
+</div>
+
+<h2 id="indexes">Master index files</h2>
+
+<p>The release page also includes two text indexes:</p>
+<ul>
+  <li><code>SHASUMS.txt</code> &mdash; every hash for files under <code>bin/</code>.</li>
+  <li><code>COMBOSUMS.txt</code> &mdash; every hash for files under <code>dist/bundles/</code>.</li>
+</ul>
+
+<p>These are convenient for verifying multiple downloads in one pass. They are themselves unsigned, so use them only to compare against the per-file sidecars (which match the on-page checksums GitHub itself displays for every release asset).</p>
+
+<h2 id="tag-verify">Verifying the release tag</h2>
+
+<p>The Git tag <code>v0.1</code> is annotated. To inspect it:</p>
+<pre><code>git fetch --tags
+git tag -v v0.1</code></pre>
+<p>This confirms the tag's author identity and shows the message GitHub displays on the release page. The same identity authors every commit on <code>main</code>.</p>
+
+<h2 id="reproducing">Reproducing the build locally</h2>
+
+<p>Once you have the source clone, you can rebuild the APK locally and compare its hashes to the published ones. The cross-compile scripts apply <code>--remap-path-prefix</code> so workstation-specific paths don't end up in the shipped binaries, and the workspace's <code>profile.release</code> is configured for <code>strip = true, debug = false</code>. Combined with deterministic Gradle timestamps, the same source on the same toolchain produces byte-identical output. See <a href="building.html">Building from source</a> for the full pipeline.</p>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

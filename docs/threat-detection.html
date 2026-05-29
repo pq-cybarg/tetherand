@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Threat detection · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="On-device cellular and Wi-Fi threat detection with deterministic heuristics and a per-location baseline.">
+<meta property="og:title" content="Threat detection · Tetherand">
+<meta property="og:description" content="On-device cellular and Wi-Fi threat detection with deterministic heuristics and a per-location baseline.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/threat-detection.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html" class="current">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>Threat detection</h1>
+
+<p>The Threat tab runs a small set of on-device detectors continuously and surfaces their findings as alerts in a feed. Every detector is deterministic &mdash; it follows a rule, not a model &mdash; so its behaviour is auditable and reproducible.</p>
+
+<h2 id="surfaces">What's monitored</h2>
+
+<p>The detection pipeline checks five environment surfaces in parallel:</p>
+
+<ol>
+  <li><strong>Cellular</strong> &mdash; the neighbour-cell list, broadcast SIBs, paging patterns, RAT downgrades, and TAC changes without corresponding motion. This is where IMSI catchers, paging-storm interception, and Stingray-style downgrade attacks show up.</li>
+  <li><strong>Wi-Fi</strong> &mdash; beacon-frame fingerprints, deauth bursts, and SSID/BSSID drift. Catches evil-twin access points and Pineapple-style interception rigs.</li>
+  <li><strong>Bluetooth Low Energy</strong> &mdash; proximity tracker fingerprints (Tile, AirTag, Galaxy SmartTag, Chipolo, etc.) within scan range.</li>
+  <li><strong>App audit</strong> &mdash; permission drift on installed packages compared to the baseline taken at threat-tab open.</li>
+  <li><strong>Geographic baseline</strong> &mdash; every cellular observation is grouped by a six-character geohash. Anything that doesn't match the baseline for that geohash gets surfaced; the baseline grows automatically as you spend time in each area.</li>
+</ol>
+
+<h2 id="tab">The Threat tab</h2>
+
+<p>Five sections, top to bottom:</p>
+<ul>
+  <li><strong>Risk meter</strong> &mdash; sum of recent alert severities, capped at 100.</li>
+  <li><strong>Detection mode</strong> &mdash; which tier of heuristics is currently active. Tier 0 is the default and uses NetMonster reflection plus AIMSICD-style cell-info checks. Tier 1 requires an SDR dongle plugged in over USB-OTG. Tier 2 requires root.</li>
+  <li><strong>Hardened Mode toggle</strong> &mdash; opens the <a href="hardened-mode.html">Hardened Mode</a> walkthrough.</li>
+  <li><strong>Incident response</strong> &mdash; four-button runbook covered in <a href="hardened-mode.html#incident-response">Hardened Mode</a>.</li>
+  <li><strong>Recent alerts</strong> &mdash; the last fifty alerts, newest first.</li>
+</ul>
+
+<h2 id="alerts">Reading an alert</h2>
+
+<p>Each alert carries:</p>
+<ul>
+  <li>A <strong>summary</strong> in plain English.</li>
+  <li>A <strong>severity</strong> &mdash; Low, Medium, High, or Critical.</li>
+  <li>A <strong>timestamp</strong> in your local time.</li>
+  <li>A <strong>geohash</strong> of where the alert was triggered (six characters, about 1.2&nbsp;km square).</li>
+  <li>An <strong>evidence blob</strong> &mdash; JSON with the raw values that triggered the rule. Tap to expand.</li>
+</ul>
+
+<p>Severity is purely a sum of rule-confidence weights. None of the detectors directly trigger a destructive action &mdash; the panic button is always user-initiated.</p>
+
+<h2 id="heuristics">Heuristics</h2>
+
+<table>
+  <tr><th>Heuristic</th><th>Looks for</th></tr>
+  <tr><td><strong>BTS Algorithm</strong></td><td>Implausible cell-broadcast values (LAC/CID/MCC/MNC outside the carrier's range, or duplicate cells from different operators)</td></tr>
+  <tr><td><strong>RAT downgrade</strong></td><td>LTE &rarr; UMTS &rarr; GSM forced downgrades</td></tr>
+  <tr><td><strong>TAC change without motion</strong></td><td>Tracking-area updates without a corresponding accelerometer-based location shift</td></tr>
+  <tr><td><strong>EARFCN allocation</strong></td><td>Cells operating on out-of-band ARFCN values</td></tr>
+  <tr><td><strong>Reattach storm</strong></td><td>Multiple network-rejection / reattach cycles in a short window</td></tr>
+  <tr><td><strong>Evil-twin Wi-Fi</strong></td><td>SSIDs that match a known good one but with different BSSID and weaker security</td></tr>
+  <tr><td><strong>BLE tracker</strong></td><td>Manufacturer-data patterns matching known commercial trackers</td></tr>
+  <tr><td><strong>App permission diff</strong></td><td>Permissions appearing on installed packages after baseline</td></tr>
+</table>
+
+<h2 id="baseline">Per-location baseline</h2>
+
+<p>Tetherand does <strong>not</strong> ship a global cell-tower database &mdash; that would need ongoing updates and reveal which DBs you mirror. Instead, the first time the phone visits a given geohash, the cells it sees there become the baseline for that hash. Subsequent visits that introduce new cells, especially ones with implausible parameters, fire alerts.</p>
+
+<p>The baseline lives in the on-device Room database, encrypted at rest. It is never transmitted.</p>
+
+<h2 id="panic">Panic button</h2>
+
+<p>The bright-red <strong>PANIC</strong> button at the bottom of the Threat tab does three things atomically:</p>
+<ol>
+  <li>Stops the privacy chain.</li>
+  <li>Disconnects the Wi-Fi adapter.</li>
+  <li>Drops the cellular radio into airplane mode.</li>
+</ol>
+
+<p>It does not wipe data. For that, see the <strong>Burn</strong> button in <a href="hardened-mode.html#incident-response">Hardened Mode</a>.</p>
+
+<h2 id="tiers">Detection tiers</h2>
+
+<p>The default Tier 0 runs on stock Android with no extra hardware. The optional tiers add fidelity:</p>
+
+<table>
+  <tr><th>Tier</th><th>What it adds</th><th>Requires</th></tr>
+  <tr><td>Tier 0</td><td>NetMonster reflection + AIMSICD/SnoopSnitch/Crocodile-Hunter heuristics</td><td>Nothing extra</td></tr>
+  <tr><td>Tier 1</td><td>SDR-driven LTE control-channel decode (SIB/MIB parsing, paging-storm detection at the air interface)</td><td>RTL-SDR or HackRF One plugged in via USB-OTG</td></tr>
+  <tr><td>Tier 2</td><td>MediaTek modem diagnostic readers (<code>/proc/ccci_md1_*</code>, mdlog parser, AT-command channel)</td><td>Root</td></tr>
+</table>
+
+<p>Each tier degrades cleanly to the next-lower when its requirement is absent. Tier 1 surfaces &quot;No SDR detected&quot; with a $30 RTL-SDR shopping link; Tier 2 surfaces &quot;Dormant &mdash; device is not rooted&quot;.</p>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

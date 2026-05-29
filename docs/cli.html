@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CLI reference · Tetherand</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Every tetherand subcommand, convenience wrapper, Makefile target, and environment variable.">
+<meta property="og:title" content="CLI reference · Tetherand">
+<meta property="og:description" content="Every tetherand subcommand, convenience wrapper, Makefile target, and environment variable.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/logo.png">
+<meta property="og:url" content="https://pq-cybarg.github.io/tetherand/cli.html">
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="mobile-bar">
+  <img src="img/logo.png" alt="">
+  <h1>Tetherand</h1>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <img src="img/logo.png" alt="Tetherand logo">
+      <span>
+        <h1>Tetherand</h1>
+        <small>v0.1 · Solana Seeker · DEFCON</small>
+      </span>
+    </a>
+    <nav>
+      <h5>Project</h5><ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="installing.html">Installing</a></li>
+      <li><a href="verifying.html">Verifying downloads</a></li>
+      <li><a href="cli.html" class="current">CLI reference</a></li>
+      </ul>
+      <h5>Features</h5><ul>
+      <li><a href="privacy-chain.html">Privacy chain</a></li>
+      <li><a href="threat-detection.html">Threat detection</a></li>
+      <li><a href="hardened-mode.html">Hardened Mode</a></li>
+      <li><a href="ai-guard.html">AI Guard</a></li>
+      </ul>
+      <h5>Build</h5><ul>
+      <li><a href="building.html">Building from source</a></li>
+      <li><a href="bundles.html">Bundle combinations</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      </ul>
+      <h5>More</h5><ul>
+      <li><a href="roadmap.html">Roadmap</a></li>
+      <li><a href="licensing.html">Licensing</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <main>
+    
+<h1>CLI reference</h1>
+
+<p>The <code>tetherand</code> binary is the host-side reverse-tether driver. Once built (<code>make build</code>) it lives at <code>bin/tetherand</code> in the repo.</p>
+
+<h2 id="run">tetherand run</h2>
+
+<p>The main command. Starts the reverse-tether and blocks until you press Ctrl-C.</p>
+
+<pre><code>tetherand run                       # USB-ADB transport (default)
+tetherand run --transport adb       # explicit USB-ADB
+tetherand run --transport tcp       # LAN-TCP transport
+tetherand run --transport bt        # Bluetooth-RFCOMM
+tetherand run --transport aoa       # USB Open Accessory
+tetherand run --device &lt;SERIAL&gt;     # target a specific adb device
+tetherand run --port 31416          # override the default reverse port</code></pre>
+
+<p>The ADB transport works by running <code>adb reverse localabstract:tetherand tcp:N</code> to bridge the phone's LocalSocket back to a TCP port on the laptop. The relay binds that TCP port and forwards traffic through the host's normal network egress.</p>
+
+<h2 id="install">tetherand install / uninstall / status</h2>
+
+<pre><code>tetherand install                   # installs bin/tetherand.apk
+tetherand install --device &lt;SERIAL&gt;
+tetherand uninstall                 # removes dev.tetherand.app
+tetherand status                    # shows connected devices + version</code></pre>
+
+<h2 id="tui">tetherand tui</h2>
+
+<p>Opens a four-panel terminal dashboard:</p>
+<ul>
+  <li><strong>TRANSPORTS</strong> &mdash; which transports are connected.</li>
+  <li><strong>TRAFFIC</strong> &mdash; sparkline of recent rx/tx volume.</li>
+  <li><strong>DEVICES</strong> &mdash; connected adb devices.</li>
+  <li><strong>EVENTS</strong> &mdash; recent connect/disconnect events.</li>
+</ul>
+<p>Press <kbd>q</kbd>, <kbd>Q</kbd>, or <kbd>Esc</kbd> to exit.</p>
+
+<h2 id="convenience">Convenience wrappers</h2>
+
+<pre><code>./connect.sh                        # start tether (uses bin/tetherand if present,
+                                    # else falls back to gnirehtet)
+./connect.sh --stop                 # tear down
+./connect.sh --reinstall            # uninstall + reinstall + relaunch</code></pre>
+
+<h2 id="defcon">DEFCON pre-flight scripts</h2>
+
+<pre><code>./tutorial.sh                       # browser playbook on http://localhost:7331
+./backup.sh                         # local encrypted backup of the phone
+./restore.sh                        # restore from backup
+./scripts/defcon-prep.sh            # pre-conference hardening
+./scripts/defcon-prep.sh --post     # post-conference attestation diff</code></pre>
+
+<h2 id="release">Build / release / verification scripts</h2>
+
+<pre><code>./scripts/hash-artifacts.sh         # emit SHA-256 + SHA3-256 sidecars
+./scripts/bundle-combinations.sh    # emit every native-lib subset zip
+./scripts/release-sign.sh           # build + zipalign + apksigner-sign release APK
+./scripts/release-upload.sh v0.1    # upload assets to a GitHub release
+./scripts/smoke-device.sh           # on-device smoke walk
+./scripts/install-launchagent.sh    # install macOS LaunchAgent</code></pre>
+
+<p>The LaunchAgent watches USB attach events for the Solana Seeker's vendor:product IDs (0x18d1:0x4ee7 / 0x4ee2 / 0x2d01 / 0x2d00) and auto-fires <code>tetherand run</code> whenever the device is plugged in.</p>
+
+<h2 id="make">Makefile targets</h2>
+
+<pre><code>make build           # cargo build + apk build + hash sidecars
+make native-all      # cross-compile all 5 native libs
+make native-{wg,tor,nym,pt,rtlsdr}  # individual native libs
+make apk             # repackage APK with current jniLibs + emit hashes
+make install         # adb install + pre-grant VPN consent
+make smoke           # end-to-end test
+make smoke-device    # on-device tab walk
+make hashes          # regenerate sidecars
+make release         # debug-signed release APK
+make release-signed  # full release-signing pipeline
+make launcher        # install macOS LaunchAgent
+make test            # cargo test --workspace
+make clean           # cargo + gradle clean + bin/ wipe</code></pre>
+
+<h2 id="env">Environment variables</h2>
+
+<table>
+  <tr><th>Variable</th><th>Default</th><th>What it does</th></tr>
+  <tr><td><code>NDK_HOME</code> / <code>ANDROID_NDK_HOME</code></td><td>autodetected from <code>~/Library/Android/sdk/ndk/*</code></td><td>Path to the Android NDK installation</td></tr>
+  <tr><td><code>ANDROID_HOME</code></td><td><code>~/Library/Android/sdk</code></td><td>Path to the Android SDK (apksigner, zipalign)</td></tr>
+  <tr><td><code>CARGO_HOME</code></td><td><code>~/.cargo</code></td><td>Used by remap-path-prefix scrubbing</td></tr>
+  <tr><td><code>KEYSTORE</code></td><td><code>~/.android/debug.keystore</code></td><td>Signing keystore for <code>release-signed</code></td></tr>
+  <tr><td><code>KS_PASS</code> / <code>KEY_PASS</code></td><td><code>android</code> (debug)</td><td>Keystore + key passwords</td></tr>
+  <tr><td><code>KEY_ALIAS</code></td><td><code>androiddebugkey</code></td><td>Keystore alias</td></tr>
+  <tr><td><code>TETHERAND_SIGNING_ALLOW</code></td><td><code>~/.tetherand-signing-allow</code></td><td>Approved-DN allow-list file</td></tr>
+  <tr><td><code>TETHERAND_NYM_SDK</code></td><td><code>0</code></td><td>Set to <code>1</code> to enable nym-sdk feature on the Nym build</td></tr>
+  <tr><td><code>TETHERAND_USB_POLL_SEC</code></td><td><code>1</code></td><td>LaunchAgent USB-watcher poll interval</td></tr>
+</table>
+
+    <div class="toc-bottom">
+      <h4>Elsewhere</h4>
+      <div class="links">
+        <a href="https://github.com/pq-cybarg/tetherand">GitHub</a>
+        <a href="https://github.com/pq-cybarg/tetherand/releases">Releases</a>
+        <a href="https://github.com/pq-cybarg/tetherand/wiki">Wiki</a>
+        <a href="https://github.com/pq-cybarg/tetherand/issues">Issues</a>
+      </div>
+    </div>
+    <footer class="site-footer">
+      <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
+      <div>Built for DEFCON 34 · 2026</div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
