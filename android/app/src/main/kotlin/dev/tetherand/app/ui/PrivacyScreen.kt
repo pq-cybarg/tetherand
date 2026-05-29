@@ -341,6 +341,20 @@ fun PrivacyScreen(onStart: (String, Boolean) -> Unit, onStop: () -> Unit) {
                     Spacer(Modifier.padding(end = 8.dp))
                     Text("Prefer PQ-NTor handshake (prop362 / NTor-ML-KEM-v1)", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
                 }
+                // Bundled-PT presence indicator. Each chip shows whether
+                // the corresponding binary is present in the APK's
+                // nativeLibraryDir. Green = present (PT will work).
+                // Amber = absent (run the cross-compile script).
+                val staged = remember { dev.tetherand.app.chain.PtBinaryStager.stage(ctx) }
+                Text("Pluggable transports — bundled binaries:", fontWeight = FontWeight.SemiBold,
+                     color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    PtBadge("obfs4",     staged.ptBridge != null)
+                    PtBadge("meek",      staged.ptBridge != null)
+                    PtBadge("webtunnel", staged.ptBridge != null)
+                    PtBadge("snowflake", staged.snowflake != null)
+                    PtBadge("conjure",   staged.conjure != null)
+                }
                 Button(modifier = Modifier.fillMaxWidth(), onClick = {
                     val lines = torBridges.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
                     torStore.save(dev.tetherand.app.tor.TorConfig(
@@ -416,6 +430,21 @@ private fun configToText(c: dev.tetherand.app.chain.WireGuardConfig): String {
         Endpoint   = ${c.endpointHost}:${c.endpointPort}
         PersistentKeepalive = ${c.persistentKeepaliveSecs}
     """.trimIndent()
+}
+
+@Composable
+private fun PtBadge(name: String, present: Boolean) {
+    val color = if (present) Color(0xFF00D68F) else Color(0xFFFFC857)
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.background)
+            .border(1.dp, color, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        Text("${if (present) "●" else "○"} $name", color = color,
+             fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+    }
 }
 
 @Composable
