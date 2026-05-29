@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- M2 LaunchAgent — auto-start `tetherand run` when the Seeker plugs
+     in over USB.
+
+     install with:  ./scripts/install-launchagent.sh
+     uninstall:     launchctl unload ~/Library/LaunchAgents/com.tetherand.launcher.plist
+                    rm ~/Library/LaunchAgents/com.tetherand.launcher.plist
+
+     The agent runs scripts/usb-watcher.sh which polls IOKit for the
+     Solana Mobile vendor:product ID and shells out to `tetherand run`
+     on attach. Edit the polling interval there if you don't want the
+     1-second default. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tetherand.launcher</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>exec "$HOME/Desktop/personal/android/reverse-tethering/scripts/usb-watcher.sh"</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/tetherand-launcher.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/tetherand-launcher.err</string>
+</dict>
+</plist>

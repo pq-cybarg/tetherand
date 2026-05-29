@@ -40,7 +40,11 @@ enum Cmd {
     Uninstall { #[arg(long)] device: Option<String> },
     Reinstall { #[arg(long)] device: Option<String> },
     Status,
+    /// M2: launch the ratatui dashboard.
+    Tui,
 }
+
+mod tui;
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
 enum TransportChoice { Adb, Tcp }
@@ -192,6 +196,34 @@ fn cmd_status() -> Result<()> {
     Ok(())
 }
 
+fn cmd_tui() -> Result<()> {
+    use std::sync::{Arc, Mutex};
+    let state = Arc::new(Mutex::new(tui::DashboardState::default()));
+    // Seed with the current adb-attached devices + transport rows so the
+    // dashboard isn't empty on first paint.
+    {
+        let mut s = state.lock().unwrap();
+        s.transports.push(tui::TransportRow { name: "usb-adb".into(), connected: false, note: "adb forward".into() });
+        s.transports.push(tui::TransportRow { name: "usb-aoa".into(), connected: false, note: "accessory mode".into() });
+        s.transports.push(tui::TransportRow { name: "bt".into(),     connected: false, note: "RFCOMM".into() });
+        s.transports.push(tui::TransportRow { name: "tcp".into(),    connected: false, note: "LAN 31417".into() });
+        // Populate devices from `adb devices -l`.
+        if let Ok(out) = run_adb(None, &["devices", "-l"]) {
+            for line in String::from_utf8_lossy(&out.stdout).lines().skip(1) {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 && parts[1] == "device" {
+                    s.devices.push(tui::DeviceRow {
+                        serial: parts[0].to_string(),
+                        model: parts.iter().find(|p| p.starts_with("model:")).map(|p| p.trim_start_matches("model:").to_string()).unwrap_or_default(),
+                        transport: "usb-adb".into(),
+                    });
+                }
+            }
+        }
+    }
+    tui::run(state).map_err(|e| anyhow::anyhow!("tui: {e}"))
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     init_log(cli.log.as_deref());
@@ -201,5 +233,6 @@ fn main() -> Result<()> {
         Cmd::Uninstall { device }            => adb_uninstall(device.as_deref()),
         Cmd::Reinstall { device }            => { adb_uninstall(device.as_deref())?; adb_install(device.as_deref()) }
         Cmd::Status                          => cmd_status(),
+        Cmd::Tui                             => cmd_tui(),
     }
 }
