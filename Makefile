@@ -1,5 +1,5 @@
 # Tetherand top-level orchestration. POSIX-compatible.
-.PHONY: all build relay apk native-wg install uninstall clean test smoke release chain
+.PHONY: all build relay apk native-wg native-tor native-nym native-pt native-rtlsdr native-all install uninstall clean test smoke smoke-device release release-signed hashes chain launcher
 
 REPO    := $(shell pwd)
 RELAY   := $(REPO)/relay
@@ -19,11 +19,31 @@ relay:
 native-wg:
 	bash scripts/build-wg-android.sh
 
+native-tor:
+	bash scripts/build-tor-android.sh
+
+native-nym:
+	bash scripts/build-nym-android.sh
+
+native-pt:
+	bash scripts/build-pt-bridge-android.sh
+	bash scripts/build-pts-android.sh
+
+native-rtlsdr:
+	bash scripts/build-rtlsdr-android.sh
+
+native-all: native-wg native-tor native-nym native-pt native-rtlsdr
+	@echo "  ✓ all native libs cross-compiled into jniLibs/arm64-v8a/"
+
+launcher:
+	bash scripts/install-launchagent.sh
+
 apk: native-wg
 	cd $(ANDROID) && ./gradlew :app:assembleDebug
 	@mkdir -p $(BIN)
 	@cp $(ANDROID)/app/build/outputs/apk/debug/app-debug.apk $(BIN)/tetherand.apk
-	@echo "  ✓ APK built at $(BIN)/tetherand.apk"
+	@bash scripts/hash-artifacts.sh
+	@echo "  ✓ APK built at $(BIN)/tetherand.apk (+ SHA-256/SHA3-256 sidecars)"
 
 chain: build
 	@echo "Chain build complete. Open Tetherand → Privacy tab to configure."
@@ -52,6 +72,16 @@ test:
 
 smoke: build install
 	bash scripts/smoke.sh
+
+smoke-device: install
+	bash scripts/smoke-device.sh
+
+release-signed:
+	bash scripts/release-sign.sh
+
+# Emit SHA-256 + SHA3-256 hashes for every artefact in bin/.
+hashes:
+	bash scripts/hash-artifacts.sh
 
 clean:
 	cd $(RELAY)   && cargo clean
