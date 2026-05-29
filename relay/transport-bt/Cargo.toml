@@ -1,0 +1,19 @@
+[package]
+name = "tetherand-transport-bt"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Bluetooth RFCOMM transport for Tetherand. Host (Mac) side discovers the paired Seeker and connects to a Tetherand-private SPP-derived service UUID."
+
+[dependencies]
+tetherand-transport-api = { path = "../transport-api" }
+tetherand-codec = { path = "../codec" }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+bytes = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+btleplug = "0.11"
+uuid = { version = "1.10", features = ["v4"] }
+futures = "0.3"
