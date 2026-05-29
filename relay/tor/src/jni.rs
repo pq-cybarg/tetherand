@@ -20,7 +20,9 @@ fn init_logger() {
 
 /// Init the Tor runtime. Returns a handle (Box::into_raw cast to i64);
 /// 0 on error. `bridges_csv` is a comma-separated list of BridgeDB-
-/// format lines.
+/// format lines. PT binary paths are optional — if a PT bridge is
+/// requested without a corresponding path the build() returns a
+/// config error which we log + return 0.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeInit(
     mut env: JNIEnv,
@@ -30,11 +32,17 @@ pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeInit(
     bridges_csv: JString,
     vanguards: jboolean,
     prefer_pq: jboolean,
+    pt_bridge_path: JString,
+    snowflake_path: JString,
+    conjure_path: JString,
 ) -> jlong {
     init_logger();
     let cache: String = match env.get_string(&cache_dir) { Ok(s) => s.into(), Err(_) => return 0 };
     let state: String = match env.get_string(&state_dir) { Ok(s) => s.into(), Err(_) => return 0 };
     let csv: String = match env.get_string(&bridges_csv) { Ok(s) => s.into(), Err(_) => "".into() };
+    let pt: String = env.get_string(&pt_bridge_path).map(Into::into).unwrap_or_default();
+    let sf: String = env.get_string(&snowflake_path).map(Into::into).unwrap_or_default();
+    let cj: String = env.get_string(&conjure_path).map(Into::into).unwrap_or_default();
     let bridges = csv.split(',')
         .map(str::trim)
         .filter(|s| !s.is_empty())
@@ -44,6 +52,9 @@ pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeInit(
     b.bridges = bridges;
     b.vanguards = vanguards != 0;
     b.prefer_pq_handshake = prefer_pq != 0;
+    if !pt.is_empty() { b.pt_bridge_path = Some(pt); }
+    if !sf.is_empty() { b.snowflake_path = Some(sf); }
+    if !cj.is_empty() { b.conjure_path = Some(cj); }
     match b.build() {
         Ok(rt) => Box::into_raw(Box::new(rt)) as jlong,
         Err(e) => { log::error!("tor init failed: {e}"); 0 }

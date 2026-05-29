@@ -24,6 +24,16 @@ pub struct TorBuilder {
     pub prefer_pq_handshake: bool,
     pub cache_dir: String,
     pub state_dir: String,
+    /// Absolute path to the `tetherand-pt` binary on the device (or
+    /// host for tests). Used for obfs4 / meek / webtunnel — those three
+    /// PT names are dispatched in-process inside tetherand-pt.
+    pub pt_bridge_path: Option<String>,
+    /// Absolute path to the Go upstream snowflake-client binary. Off
+    /// unless the user ran scripts/build-pts-android.sh.
+    pub snowflake_path: Option<String>,
+    /// Absolute path to the Go upstream conjure-client binary. Off
+    /// unless the user ran scripts/build-pts-android.sh.
+    pub conjure_path: Option<String>,
 }
 
 impl TorBuilder {
@@ -34,6 +44,9 @@ impl TorBuilder {
             prefer_pq_handshake: cfg!(feature = "pq-tor"),
             cache_dir,
             state_dir,
+            pt_bridge_path: None,
+            snowflake_path: None,
+            conjure_path: None,
         }
     }
 
@@ -54,17 +67,17 @@ impl TorBuilder {
             .cache_dir(arti_client::config::CfgPath::new(self.cache_dir.clone()))
             .state_dir(arti_client::config::CfgPath::new(self.state_dir.clone()));
 
-        // Bridges. For vanilla bridges we feed the address+fingerprint
-        // line. PT bridges need the PT framework; v1 surfaces a clear
-        // config error rather than silently dropping them.
+        // Bridges. Vanilla → arti's bridge list. PT-prefixed → also into
+        // arti's bridge list, plus we register a managed-PT transport
+        // pointing at the matching binary. Per pt-spec arti will spawn
+        // the binary, handshake on stdin/stdout, and dial the SOCKS5
+        // port the binary opened per protocol.
+        let mut pt_protocols_needed: std::collections::BTreeSet<String> =
+            std::collections::BTreeSet::new();
         for b in &self.bridges {
-            if b.transport.is_some() {
-                return Err(TorError::Config(format!(
-                    "pluggable transport `{}` requires the M6.x PT framework",
-                    b.transport.as_deref().unwrap_or("")
-                )));
+            if let Some(t) = &b.transport {
+                pt_protocols_needed.insert(t.clone());
             }
-            // arti's bridge config takes string lines.
             let parsed = b.to_arti_toml().parse()
                 .map_err(|e: arti_client::config::BridgeParseError| TorError::Config(format!("bridge: {e}")))?;
             cfg_builder.bridges().bridges().push(parsed);
@@ -72,6 +85,30 @@ impl TorBuilder {
         if !self.bridges.is_empty() {
             cfg_builder.bridges()
                 .enabled(arti_client::config::BoolOrAuto::Explicit(true));
+        }
+        // Register managed transports. obfs4 + meek + webtunnel all go
+        // to the single tetherand-pt binary; snowflake + conjure each
+        // get their own upstream Go binary.
+        for proto in &pt_protocols_needed {
+            let (path, name) = match proto.as_str() {
+                "obfs4" | "meek" | "webtunnel" =>
+                    (self.pt_bridge_path.as_ref(), "tetherand-pt"),
+                "snowflake" => (self.snowflake_path.as_ref(), "snowflake-client"),
+                "conjure"   => (self.conjure_path.as_ref(), "conjure-client"),
+                other => return Err(TorError::Config(format!(
+                    "unknown PT `{other}` — supported: obfs4/meek/webtunnel/snowflake/conjure"))),
+            };
+            let path = path.ok_or_else(|| TorError::Config(format!(
+                "PT `{proto}` requested but {name} path not configured; \
+                 run scripts/build-pt-bridge-android.sh or scripts/build-pts-android.sh \
+                 and re-init with the staged binary path")))?;
+            let mut t = arti_client::config::pt::TransportConfigBuilder::default();
+            let pt_name: arti_client::config::PtTransportName = proto.parse()
+                .map_err(|e| TorError::Config(format!("pt name: {e}")))?;
+            t.protocols(vec![pt_name])
+             .path(arti_client::config::CfgPath::new(path.clone()))
+             .run_on_startup(true);
+            cfg_builder.bridges().transports().push(t);
         }
 
         // Vanguards: arti routes this through the channel manager. The
