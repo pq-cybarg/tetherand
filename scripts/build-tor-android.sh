@@ -24,6 +24,14 @@ export CXX_aarch64_linux_android="$TOOLCHAIN/$HOST_TAG/bin/aarch64-linux-android
 export AR_aarch64_linux_android="$TOOLCHAIN/$HOST_TAG/bin/llvm-ar"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CC_aarch64_linux_android"
 
+# Strip build-host PII from the .so. Rust panic-location strings embed
+# every touched source path in .rodata (which `strip = "symbols"` does
+# not touch). --remap-path-prefix rewrites those at compile time. See
+# scripts/build-wg-android.sh for the rationale.
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+RUST_REMAP="--remap-path-prefix=$HOME=~ --remap-path-prefix=${CARGO_HOME:-$HOME/.cargo}=/cargo --remap-path-prefix=$REPO_ROOT/relay=/build"
+export RUSTFLAGS="${RUSTFLAGS:-} $RUST_REMAP"
+
 cd "$(dirname "$0")/../relay"
 cargo build --release --target=$TARGET -p tetherand-tor --features android
 

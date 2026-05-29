@@ -33,4 +33,10 @@ mdns-sd = "0.13"
 [profile.release]
 lto = "thin"
 codegen-units = 1
-strip = "symbols"
+# Strip symbols AND debuginfo so the .so contains no panic-location
+# source-path strings (those live in .rodata, not .symtab, and survive
+# a plain `strip = "symbols"` — leaking the build host's $HOME). Combined
+# with the cross-compile scripts' RUSTFLAGS=--remap-path-prefix this gets
+# every Android-bound artifact clean of build-host PII.
+strip = true
+debug = false
