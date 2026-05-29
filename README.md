@@ -170,20 +170,15 @@ not configurable through the UI.
 
 ## License
 
-Multi-module, tracking each subsystem's upstream license:
+The original work in this repository is licensed under the
+[**MIT License**](LICENSE). Forked, ported, and vendored subcomponents
+retain their upstream licenses; the assembled APK and the host-side
+binary are governed by **GPL-3.0-or-later** in aggregate because
+GPL-3.0 ports are linked into them.
 
-- **Tether (M1, M2):** Apache-2.0. Forked from Genymobile/gnirehtet
-  `relay-rust/` and `app/` (both Apache-2.0, verified against
-  `upstream/LICENSE`). New code in this subsystem is Apache-2.0.
-- **Privacy Chain (M3–M6):** mixed. WireGuard userspace is
-  MIT/Apache-2.0; Mullvad libraries are GPLv3; NymVPN client is GPLv3;
-  Tor's Arti is MIT/Apache-2.0.
-- **Threat Detection (M7):** GPLv3. Ports of AIMSICD, SnoopSnitch,
-  NetMonster-core, and Crocodile Hunter — all GPLv3.
-- **Whole APK once M3+ links in:** GPLv3.
-
-`NOTICE` files under each subdirectory document the per-subcomponent
-origin and license.
+[`LICENSE.md`](LICENSE.md) has the full per-milestone licensing map
+plus notes on the GPL aggregation boundary. Per-subdirectory `NOTICE`
+files document specific upstream origins where applicable.
 
 ## Repo layout
 
