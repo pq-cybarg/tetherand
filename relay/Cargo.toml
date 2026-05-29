@@ -9,6 +9,7 @@ members = [
     "cli",            # `tetherand` binary; M1 wraps core::relay() + adb forward
     "wg",             # M3: BoringTun WireGuard wrapper + JNI bindings for Android
     "tor",            # M6: arti-client embedded + bridges + vanguards + JNI for Android
+    "pt-bridge",      # M6.x: PT-spec binary implementing obfs4 + meek + webtunnel
 ]
 
 [workspace.package]
