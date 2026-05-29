@@ -30,7 +30,14 @@ RUST_REMAP="--remap-path-prefix=$HOME=~ --remap-path-prefix=${CARGO_HOME:-$HOME/
 export RUSTFLAGS="${RUSTFLAGS:-} $RUST_REMAP"
 
 cd "$REPO_ROOT/relay"
-cargo build --release --target=$TARGET -p tetherand-nym --features "android,with-sdk"
+# `with-sdk` opt-in via env. Default ships the JNI surface only — the
+# nym-sdk dep currently triggers an upstream nym-noise 1.20.4 type-
+# inference bug under rustc 1.83+, blocking the cross-compile until a
+# fix lands. Set TETHERAND_NYM_SDK=1 + a compatible nightly toolchain
+# to flip it on.
+FEATURES="android"
+if [ "${TETHERAND_NYM_SDK:-0}" = "1" ]; then FEATURES="android,with-sdk"; fi
+cargo build --release --target=$TARGET -p tetherand-nym --features "$FEATURES"
 
 OUT_DIR=../android/app/src/main/jniLibs/arm64-v8a
 mkdir -p "$OUT_DIR"
