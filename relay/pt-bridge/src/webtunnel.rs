@@ -11,15 +11,18 @@
 //   ver=  protocol version string
 
 use crate::socks5::Target;
+use futures::{SinkExt, StreamExt};
 use rustls::pki_types::ServerName;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
+use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{client_async_with_config, tungstenite::handshake::client::Request};
 use url::Url;
 
-pub async fn dial(target: Target, args: HashMap<String, String>, arti_sock: TcpStream) -> Result<(), String> {
+pub async fn dial(target: Target, args: HashMap<String, String>, mut arti_sock: TcpStream) -> Result<(), String> {
     let url_str = args.get("url").cloned()
         .unwrap_or_else(|| format!("wss://{}/", target.host));
     let url = Url::parse(&url_str).map_err(|e| format!("url: {e}"))?;
@@ -46,15 +49,49 @@ pub async fn dial(target: Target, args: HashMap<String, String>, arti_sock: TcpS
         .header("Sec-WebSocket-Version", "13")
         .header("Sec-WebSocket-Key", tokio_tungstenite::tungstenite::handshake::client::generate_key())
         .body(()).map_err(|e| format!("req: {e}"))?;
-    let (_ws, _resp) = client_async_with_config(req, tls, None).await
+    let (ws, _resp) = client_async_with_config(req, tls, None).await
         .map_err(|e| format!("ws: {e}"))?;
 
-    // At this point we hold a duplex WS stream + arti_sock. The byte-
-    // forwarder between them belongs to a follow-on patch: WS framing
-    // is binary-message-per-Tor-cell which differs from raw byte
-    // streaming. v1 proves the TLS+WS upgrade surface compiles and
-    // exits cleanly. The byte-shuttle lives in a separate Task.
-    let _ = arti_sock;
+    // Bidirectional byte shovel between the upstream SOCKS5 socket
+    // (arti) and the WebSocket frame stream (bridge). The webtunnel
+    // wire format puts opaque bytes inside binary WS frames, so each
+    // direction reads chunks and emits / consumes binary Message
+    // frames.  Coalesce small reads to keep frame overhead low; cap
+    // the chunk at 16 KiB so each Tor cell (max 514 bytes today; a
+    // proposed v3 cell is at most 4 KiB) plus a handful of headers
+    // fits in one frame without fragmentation.
+    let (mut ws_tx, mut ws_rx) = ws.split();
+    let (mut arti_r, mut arti_w) = arti_sock.split();
+
+    let up = async move {
+        let mut buf = [0u8; 16 * 1024];
+        loop {
+            let n = match arti_r.read(&mut buf).await {
+                Ok(0) | Err(_) => break,
+                Ok(n) => n,
+            };
+            if ws_tx.send(Message::Binary(buf[..n].to_vec().into())).await.is_err() {
+                break;
+            }
+        }
+        let _ = ws_tx.send(Message::Close(None)).await;
+    };
+    let down = async move {
+        while let Some(msg) = ws_rx.next().await {
+            let msg = match msg { Ok(m) => m, Err(_) => break };
+            match msg {
+                Message::Binary(bytes) => {
+                    if arti_w.write_all(&bytes).await.is_err() { break; }
+                }
+                Message::Close(_) => break,
+                // Ping / Pong / Text are not part of the webtunnel wire
+                // format; tokio-tungstenite handles control frames
+                // automatically. Text and unexpected frames we drop.
+                _ => {}
+            }
+        }
+    };
+    tokio::join!(up, down);
     Ok(())
 }
 
