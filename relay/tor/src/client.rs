@@ -139,13 +139,27 @@ impl TorBuilder {
             TorClient::create_bootstrapped(cfg).await
         }).map_err(|e| TorError::Bootstrap(format!("{e}")))?;
 
-        Ok(TorRuntime { rt, client })
+        Ok(TorRuntime { rt, client, socks_port: 0 })
+    }
+}
+
+impl TorRuntime {
+    /// Boot the embedded SOCKS5 listener on 127.0.0.1:0. Stores the
+    /// chosen port on `socks_port`; returns it for the JNI bridge.
+    pub fn start_socks(&mut self) -> Result<u16, TorError> {
+        if self.socks_port != 0 { return Ok(self.socks_port); }
+        let port = crate::socks::spawn(&self.rt, self.client.isolated_client())
+            .map_err(|e| TorError::Config(format!("socks bind: {e}")))?;
+        self.socks_port = port;
+        Ok(port)
     }
 }
 
 pub struct TorRuntime {
     pub rt: Arc<Runtime>,
     pub client: TorClient<PreferredRuntime>,
+    /// Local SOCKS5 port spawned at bootstrap (0 until [`start_socks`]).
+    pub socks_port: u16,
 }
 
 impl TorRuntime {

@@ -20,6 +20,7 @@
 pub mod bridge;
 pub mod client;
 pub mod jni;
+pub mod socks;
 
 pub use bridge::{Bridge, BridgeError};
 pub use client::{TorBuilder, TorRuntime, TorError};

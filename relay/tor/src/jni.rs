@@ -62,6 +62,23 @@ pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeInit(
 }
 
 /// Dial host:port. Returns 0 on success, non-zero on error.
+/// Start the embedded SOCKS5 listener on 127.0.0.1:0 and return the
+/// chosen port (or -1 on failure). Idempotent: a second call returns
+/// the existing port.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeStartSocks(
+    _env: JNIEnv,
+    _cls: JClass,
+    handle: jlong,
+) -> jint {
+    if handle == 0 { return -1; }
+    let rt: &mut crate::client::TorRuntime = unsafe { &mut *(handle as *mut _) };
+    match rt.start_socks() {
+        Ok(p) => p as jint,
+        Err(e) => { log::error!("socks start: {e}"); -1 }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_dev_tetherand_app_chain_TorHop_nativeDial(
     mut env: JNIEnv,
