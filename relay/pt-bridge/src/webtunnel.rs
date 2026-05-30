@@ -15,12 +15,20 @@ use futures::{SinkExt, StreamExt};
 use rustls::pki_types::ServerName;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{client_async_with_config, tungstenite::handshake::client::Request};
 use url::Url;
+
+/// Anomaly threshold beyond which we treat the link as compromised
+/// rather than just lossy. Repeated text / ping / pong frames on a
+/// webtunnel link are not normal traffic — they are either a probe
+/// or a misconfigured middlebox attempting MITM. Either way the
+/// circuit should not be trusted.
+const ANOMALY_BREAK_THRESHOLD: u32 = 4;
 
 pub async fn dial(target: Target, args: HashMap<String, String>, mut arti_sock: TcpStream) -> Result<(), String> {
     let url_str = args.get("url").cloned()
@@ -76,23 +84,102 @@ pub async fn dial(target: Target, args: HashMap<String, String>, mut arti_sock: 
         }
         let _ = ws_tx.send(Message::Close(None)).await;
     };
+    // Anomaly counter shared between detection sites. We don't tear the
+    // link down on a single weird frame (a flaky middlebox might inject
+    // one ping/pong as a keepalive probe) but a sustained pattern is a
+    // strong "something is in the middle" signal.
+    let anomalies = Arc::new(AtomicU32::new(0));
+    let down_anomalies = anomalies.clone();
     let down = async move {
+        let anomalies = down_anomalies;
         while let Some(msg) = ws_rx.next().await {
-            let msg = match msg { Ok(m) => m, Err(_) => break };
+            let msg = match msg {
+                Ok(m) => m,
+                Err(e) => {
+                    crate::pt_protocol::emit_pt_log(&format!("webtunnel ws err: {e}"));
+                    break;
+                }
+            };
             match msg {
                 Message::Binary(bytes) => {
-                    if arti_w.write_all(&bytes).await.is_err() { break; }
+                    // Reset the anomaly counter every time a real
+                    // payload flows. Anomalies that don't repeat
+                    // after legit traffic resumes are most likely
+                    // middlebox noise rather than an active probe.
+                    anomalies.store(0, Ordering::Relaxed);
+                    if let Err(e) = arti_w.write_all(&bytes).await {
+                        crate::pt_protocol::emit_pt_log(&format!("webtunnel write upstream: {e}"));
+                        break;
+                    }
                 }
-                Message::Close(_) => break,
-                // Ping / Pong / Text are not part of the webtunnel wire
-                // format; tokio-tungstenite handles control frames
-                // automatically. Text and unexpected frames we drop.
-                _ => {}
+                Message::Close(reason) => {
+                    if let Some(r) = reason {
+                        crate::pt_protocol::emit_pt_log(&format!("webtunnel close: {} {}", r.code, r.reason));
+                    }
+                    break;
+                }
+                // The webtunnel wire format is binary-only. tokio-tungstenite
+                // handles Ping/Pong control frames automatically; anything
+                // that surfaces here is unexpected and worth tracking.
+                Message::Text(t) => {
+                    let preview = sanitize_preview(&t, 64);
+                    let n = anomalies.fetch_add(1, Ordering::Relaxed) + 1;
+                    crate::pt_protocol::emit_pt_log(&format!(
+                        "webtunnel: anomaly[text n={n} len={}] body={preview:?}", t.len(),
+                    ));
+                    crate::pt_protocol::emit_pt_status("ANOMALY=text");
+                    if n >= ANOMALY_BREAK_THRESHOLD {
+                        crate::pt_protocol::emit_pt_log(
+                            "webtunnel: anomaly threshold exceeded — tearing down circuit",
+                        );
+                        crate::pt_protocol::emit_pt_status("MITM_SUSPECTED=1");
+                        break;
+                    }
+                }
+                Message::Ping(p) => {
+                    let n = anomalies.fetch_add(1, Ordering::Relaxed) + 1;
+                    crate::pt_protocol::emit_pt_log(&format!(
+                        "webtunnel: anomaly[ping n={n} payload={} bytes]", p.len(),
+                    ));
+                    crate::pt_protocol::emit_pt_status("ANOMALY=ping");
+                    if n >= ANOMALY_BREAK_THRESHOLD {
+                        crate::pt_protocol::emit_pt_status("MITM_SUSPECTED=1");
+                        break;
+                    }
+                }
+                Message::Pong(p) => {
+                    let n = anomalies.fetch_add(1, Ordering::Relaxed) + 1;
+                    crate::pt_protocol::emit_pt_log(&format!(
+                        "webtunnel: anomaly[pong n={n} payload={} bytes]", p.len(),
+                    ));
+                    crate::pt_protocol::emit_pt_status("ANOMALY=pong");
+                    if n >= ANOMALY_BREAK_THRESHOLD {
+                        crate::pt_protocol::emit_pt_status("MITM_SUSPECTED=1");
+                        break;
+                    }
+                }
+                Message::Frame(_) => {
+                    crate::pt_protocol::emit_pt_log("webtunnel: raw frame surfaced (unusual)");
+                    crate::pt_protocol::emit_pt_status("ANOMALY=raw_frame");
+                }
             }
         }
     };
     tokio::join!(up, down);
     Ok(())
+}
+
+/// Replace any non-printable bytes with `.` and truncate. Surfacing
+/// raw attacker-controlled bytes to the log without sanitisation could
+/// itself be an injection vector (terminal escape sequences, etc).
+fn sanitize_preview(s: &str, max: usize) -> String {
+    let mut out = String::with_capacity(max);
+    for (i, c) in s.chars().enumerate() {
+        if i >= max { out.push('…'); break; }
+        if c.is_ascii_graphic() || c == ' ' { out.push(c); }
+        else { out.push('.'); }
+    }
+    out
 }
 
 fn build_tls_config() -> Arc<rustls::ClientConfig> {

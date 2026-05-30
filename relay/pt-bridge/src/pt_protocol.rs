@@ -117,3 +117,12 @@ pub fn emit_pt_log(msg: &str) {
     println!("LOG SEVERITY=warning MESSAGE=\"{escaped}\"");
     std::io::stdout().flush().ok();
 }
+
+/// Emit a PT-spec STATUS line. STATUS is the PT-spec metadata channel
+/// that arti surfaces in its event stream — perfect for security
+/// signals like `MITM_SUSPECTED=1` that the Threat tab should see
+/// even when no payload has flowed yet.
+pub fn emit_pt_status(kv: &str) {
+    println!("STATUS TRANSPORT=webtunnel {kv}");
+    std::io::stdout().flush().ok();
+}
