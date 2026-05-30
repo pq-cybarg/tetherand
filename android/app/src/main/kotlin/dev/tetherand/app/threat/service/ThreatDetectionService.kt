@@ -115,6 +115,17 @@ class ThreatDetectionService : Service() {
                 db.alerts().prune(System.currentTimeMillis() - 30L * 24 * 3600 * 1000)
             }
         }
+        // CVE-class heuristics: patch-level staleness + adbd-network
+        // surface. These are slow-changing properties so we re-evaluate
+        // every 6 hours; if anything fires it's typically a one-shot
+        // alert until the user takes action.
+        scope.launch {
+            while (isActive) {
+                dev.tetherand.app.threat.heuristic.PatchLevelStaleness.evaluate()?.let { fire(it) }
+                dev.tetherand.app.threat.heuristic.AdbdNetworkSurface.evaluate()?.let { fire(it) }
+                delay(6L * 3600 * 1000)
+            }
+        }
     }
 
     private suspend fun runCellHeuristics() {
