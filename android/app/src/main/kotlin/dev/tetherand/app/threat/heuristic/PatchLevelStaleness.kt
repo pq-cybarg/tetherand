@@ -1,5 +1,6 @@
 package dev.tetherand.app.threat.heuristic
 
+import android.content.Context
 import android.os.Build
 import dev.tetherand.app.threat.model.Alert
 import dev.tetherand.app.threat.model.Heuristic
@@ -34,8 +35,11 @@ object PatchLevelStaleness {
     private val ISO = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
 
     /** Result of one evaluation. Null when the device's patch string
-     *  is unparseable or unavailable. */
-    fun evaluate(): Alert? {
+     *  is unparseable, unavailable, or the user has suppressed this
+     *  detector on this device (e.g. a known-EoS device they're
+     *  intentionally running). */
+    fun evaluate(ctx: Context): Alert? {
+        if (ThreatSuppressions(ctx).isSuppressed(ThreatSuppressions.KEY_PATCH_STALE)) return null
         val raw = Build.VERSION.SECURITY_PATCH ?: return null
         val patchDate = try { ISO.parse(raw) } catch (_: Throwable) { null } ?: return null
         val now = System.currentTimeMillis()
