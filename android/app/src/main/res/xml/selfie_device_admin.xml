@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Minimal-privilege device-admin manifest for the Tetherand
+     selfie-on-failed-unlock feature.
+
+     We ONLY request `watch-login` — the policy that delivers
+     onPasswordFailed / onPasswordSucceeded callbacks. We do NOT
+     request force-lock, wipe-data, limit-password, encrypted-storage,
+     reset-password, expire-password, or disable-keyguard-features.
+
+     This is the smallest device-admin footprint the keyguard event
+     callbacks require. The user gets a Settings dialog showing
+     exactly this scope when they enable the admin. -->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <watch-login/>
+    </uses-policies>
+</device-admin>
