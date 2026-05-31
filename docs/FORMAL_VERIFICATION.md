@@ -1,4 +1,4 @@
-# Tetherand — Formal Cryptographic Verification
+# Tetherand — Formal Cryptographic & Whole-App Verification
 
 **Scope.** This document enumerates every cryptographic primitive that ships
 in the Tetherand release artifact and maps each one to the relevant NIST,
@@ -14,6 +14,83 @@ the IETF composite-signatures framework. But Tetherand also detects and
 counteracts non-cryptographic threats — rogue cells, ultrasonic
 side-channels, honeypot probes — where PQ overhead would be inappropriate.
 Both sets of decisions are documented below.
+
+---
+
+## 0. Adversary model
+
+Tetherand is designed against an **APT-class adversary operating in a
+hostile environment** against a device at **5364C13D posture**. The
+adversary is assumed to have, at minimum, the following capabilities:
+
+* **Network omnipresence.** Full visibility and modification rights on
+  every byte the device emits or receives, including TLS-stripping
+  proxies, DNS hijacking, and the ability to compromise a public CA
+  (so any single-cert TLS chain alone is not trusted).
+* **Boot-environment manipulation.** The kernel entropy pool may be
+  biased early in boot. The on-die hardware RNG may be fault-injectable
+  (MediaTek Boot ROM disclosure, January 2026, affects the Solana
+  Seeker SoC). User-installed root CAs may be planted.
+* **Physical proximity, intermittent.** Brief windows during which the
+  device is unattended; the adversary can plug in USB-C cables, place
+  ultrasonic beacons within audible range, run BLE-class trackers,
+  trigger lockscreen-unlock attempts.
+* **Side-channel acquisition.** DMA reads from USB3 / Thunderbolt,
+  kernel-exploit memory dumps, `/proc/<pid>/mem` reads if root is
+  achieved temporarily, forensic disk imaging.
+* **Coercion or impersonation of a trusted third party.** App-store
+  malware, a tampered-with carrier update, a hostile baseband update.
+* **Background apps with arbitrary permissions.** The user may have
+  installed a trojan app that holds `BIND_NOTIFICATION_LISTENER` or
+  `QUERY_ALL_PACKAGES` and is looking for IPC entry points into
+  Tetherand to disable defenses or exfil state.
+* **NO assumption of CRQC availability.** A cryptanalytically-relevant
+  quantum computer is assumed possible but not yet deployed; we hedge
+  with PQ across the long-lived signing channel but do not pretend
+  ECDLP is broken yet.
+
+The adversary is **assumed to have, additionally**:
+
+* **A platform-key or OS-sandbox compromise.** Other userspace apps
+  on the device may have read access to our `/data/data/dev.tetherand.app`
+  directory regardless of `MODE_PRIVATE`. We therefore treat
+  EncryptedSharedPreferences as the **only** acceptable storage for
+  any sensitive blob — the KEK lives in the AndroidKeyStore (StrongBox
+  where available, TEE on A23) and is never reachable from another
+  app's process address space even with sandbox bypass. We also
+  assume in-process JCA `KeyStore` instances may be enumerated by a
+  privileged peer; we keep the smallest possible window between key
+  decode and use, and zeroize aggressively (§11).
+* **A build-host compromise or signer takeover.** The manifest channel's
+  quadruple signature (§2) only proves the manifest came from someone
+  holding all four keys; it does not prove that someone is honest.
+  We compensate with a **second pinning layer in app code** —
+  every shipped LiteRT model SHA-256 is BAKED INTO `ModelBundle.kt`
+  at build time, and `ModelUpdater` refuses to install a model whose
+  hash differs from the in-code expectation EVEN IF the manifest is
+  validly signed. A compromised signer can therefore only re-issue
+  the EXISTING models (no value), not substitute hostile ones. The
+  `mtc_proof` field (§3) further requires that the manifest also
+  appear in a public Sigsum/Trillian-class transparency log;
+  manifests not visible to the public are rejected once the M10.x
+  log-walk verifier ships.
+* **Root persistence across factory wipe** (firmware-resident attacker
+  in the modem baseband, in `/dev/block/by-name/boot`, or in a
+  vendor-partition rootkit). Software-only mitigations cannot fully
+  defeat this — but we narrow exposure by performing **Verified-Boot
+  state + KeyStore attestation at every app cold-start**. We accept
+  both `vbs=green` (stock Android, OEM-locked) and `vbs=yellow`
+  (GrapheneOS or other re-locked custom ROM with user AVB keys);
+  both are bootloader-locked and both have a complete verified-boot
+  chain — just to different trust roots. We reject `vbs=orange`
+  (bootloader unlocked) and `vbs=red` (verified-boot failed). When
+  rejected, we refuse to load any signing keys and surface a
+  Critical alert on the Threat tab: *"this device's boot chain has
+  been tampered with — Tetherand cannot protect you here."* (See §15.)
+
+There are no "NOT assumed" carve-outs. Every defense in §§10-15 is
+justified against the maximum-strength adversary, and where a
+mitigation only partially covers a threat, that gap is documented.
 
 ---
 
@@ -284,6 +361,283 @@ Tetherand's cryptographic posture is verifiable, reproducible
 (`bash scripts/gen-signing-keys.sh` is a one-command path for any
 fork), and audit-friendly (every primitive maps to a published
 standard cited above).
+
+---
+
+## 10. SHAKE-256 entropy mixer (5364C13D-posture RNG)
+
+The Linux kernel's `getrandom(2)` (and therefore the JVM's default
+`SecureRandom`, which on Android is backed by it) is cryptographically
+strong **when the entropy pool is well-seeded**. Two scenarios in our
+adversary model break that assumption:
+
+1. **Early-boot window.** A kernel that booted without
+   `random.trust_cpu=on` can have a low-entropy window between
+   `init` and the first sufficiently-noisy interrupt. An adversary
+   who can force a reboot may catch the pool in this window.
+2. **Boot-ROM fault injection.** The MediaTek Boot ROM
+   vulnerability disclosed January 2026 (which affects the Solana
+   Seeker SoC) enables a physically-present APT-class adversary to
+   bias on-die hardware-RNG output via electromagnetic fault
+   injection. The kernel's RNG mixes the hardware source but does
+   not detect bias in it.
+
+The mitigation is **never to trust a single entropy source**. We
+implement an in-process SHAKE-256 mixer (FIPS-202, the same primitive
+NIST chose as the squeeze function for SLH-DSA-SHA2 and ML-KEM key
+expansion) that absorbs from EIGHT independent sources per call and
+squeezes whitened bytes to the consumer:
+
+| # | Source | What it provides | Adversary cost to bias |
+|---|---|---|---|
+| 1 | `/dev/urandom` (kernel pool) | OS-grade CSPRNG | low if early-boot pool is starved; high after `add_input` has saturated |
+| 2 | JCA platform `SecureRandom` | Independently-seeded JVM default; resolved against a non-self provider | medium — different code path than urandom; harder to bias both simultaneously |
+| 3 | AndroidKeyStore HW-backed per-call HMAC | StrongBox-attested salt on Seeker; TEE on A23. The key bytes never leave the keystore — we cache only the JVM Key reference (opaque). Each `engineNextBytes` triggers a fresh `HmacSHA256(callCounter ‖ nanoTime)` op through the keystore; the 32-byte output is absorbed into SHAKE then `Arrays.fill(0)`'d immediately, so there is **no long-residency HMAC bytes in JVM heap** for a forensic adversary to lift. | very high — requires TEE-firmware compromise, which would be an entirely separate APT capability |
+| 4 | Sensor jitter (accel + gyro) | Low-bit MEMS noise | very high — even an APT cannot reach into the MEMS oscillator |
+| 5 | Monotonic-clock skew | Scheduler / cache-line jitter | medium — observable through cache side-channels but a moving target across calls |
+| 6 | **drand (League of Entropy)** | 32-byte BLS-signed beacon round, every 30s, threshold-signed by ~16 independent operators | high — requires colluding majority of independent operators AND defeating our TLS pin AND defeating the Tor exit our request egresses through |
+| 7 | **NIST Beacon v2.0** | 64-byte ECDSA-P384-signed pulse from NIST, every 60s | high — requires NIST signing-key compromise AND defeating our TLS pin AND defeating Tor exit; different operator and crypto from drand so neither compromise helps the other |
+| 8 | **SHA3-256(device activity)** | 32-byte digest over battery temp/voltage + network RX/TX bytes + /proc/loadavg + /proc/uptime + JVM heap state + nanoTime + Build.FINGERPRINT | medium — adversary in process can read each signal but cannot make all of them DECISIVELY DETERMINISTIC across consecutive snapshots without the user noticing (battery temp drifts, byte counters climb monotonically, etc.) |
+
+All eight are absorbed into a single `Shake256` instance, then squeezed
+into the caller's buffer. Under the random-oracle assumption (the
+standard model used to argue SHAKE security), the output is
+computationally indistinguishable from uniform as long as **any one**
+of the eight sources supplied a single bit of unpredictable entropy.
+
+**Tor-mandatory egress for network sources (6, 7).** drand + NIST
+fetches go through the embedded Arti SOCKS5 listener exclusively by
+default; if no Tor circuit is up, the fetch is **deferred** rather
+than falling back to clear-net. The privacy intent is: a device
+polling drand/NIST every minute from a stable source IP is a
+unique fingerprint that lets either operator (or anyone with
+netflow visibility) track Tetherand installs across networks. The
+user can opt-in to clear-net fallback via `BeaconPolicy.clearnetFallback`
+on the AI tab (default OFF); Hardened Mode entry wipes the policy
+back to default so a high-risk session always starts strict.
+
+**Why a hostile beacon response cannot bias us.** Even an adversary
+who somehow controls our Tor exit AND defeats our TLS pin AND serves
+us a hostile drand round STILL cannot bias the SHAKE output — the
+six other sources contribute their own entropy, and the random-oracle
+argument applies symmetrically: only ONE source needs to be
+unpredictable for the output to be indistinguishable from uniform.
+
+**Re-entrancy.** Because we install at JCA position 1, JCA primitives
+we use INTERNALLY (KeyGenerator.generateKey, AndroidKeyStore HMAC
+ops, TLS handshakes inside our own beacon fetcher) request
+SecureRandom and get dispatched right back to us. A thread-local
+recursion guard breaks the cycle: re-entrant `engineNextBytes` calls
+on the same thread satisfy the request from `/dev/urandom` alone
+(itself a FIPS-203-grade CSPRNG), bypassing the 8-source mix. This
+preserves correctness for the inner JCA caller without infinite
+recursion. Source-3 (keystore HMAC) is eager-initialized during
+`installAsDefault` so the key-generation moment is pinned to
+`MainActivity.onCreate` rather than left to an adversary-controllable
+first-access timing.
+
+**Kotlin implementation:** `dev.tetherand.app.crypto.SeekerRng` —
+installed as `Provider` at position 1 of the JCA list in
+`MainActivity.onCreate()`, BEFORE BouncyCastle is touched. Every
+`new SecureRandom()` and every `Signature.getInstance(...).initSign(...)`
+in the process draws from the mixer.
+
+**Rust implementation:** `relay/pt-bridge/src/secure_rng.rs` —
+absorbs `getrandom(2)` + RDRAND/CNTVCT_EL0 + clock jitter + call
+counter. Used in `meek.rs` (session-ID generation) and `obfs4.rs`
+(X25519 ephemeral private key + random padding). `wg`, `tor`, and
+`core` crates already use `OsRng` from `rand_core` directly — those
+paths are not weakened (lattice / X25519 / Tor handshakes already
+demand OsRng-quality randomness from upstream) and the SHAKE mixer
+is therefore not interposed there.
+
+Performance: 32-byte fill ≈ 60 µs on Seeker (one syscall + one
+keystore HMAC + a few cycles of clock-jitter harvest). Acceptable
+everywhere except stream-cipher inner loops.
+
+---
+
+## 11. Zeroization posture
+
+Every byte sequence holding key material, signature, PSK, password, or
+HKDF output is wiped (`Arrays.fill(arr, 0)` on Kotlin / `zeroize::Zeroize`
+on Rust) at the earliest defensible point in its lifetime. The JVM
+makes the perfect version of this impossible — `String` is immutable
+and `ByteArray` may have been relocated by GC — but we narrow the
+heap-residency window aggressively.
+
+| Site | Treatment |
+|---|---|
+| `WireGuardConfig.{privateKey,peerPublicKey,presharedKey}` | wiped in `WireGuardConfig.zeroize()`, called from `WireGuardHop.stop()` after the JNI WG instance is freed |
+| `ShadowsocksSocket` password | best-effort reflection wipe of the `String.value` field immediately after the JNI handoff in `connect()` |
+| OSINT password (UI) | dropped from Compose state before the network call; reflection-wiped after the SHA-1 hash is computed |
+| `OsintExposureProbe.isPasswordPwned` SHA-1 input + output bytes | wiped via `SecureBytes.wipe(byteArray)` in a finally block |
+| `SeekerRng` per-call buffers (`sys`, `jitter`, etc.) | wiped before SHAKE squeezes; reduces "secrets in temp buffers" window to a single function call |
+| Rust `secure_rng::fill` per-call buffers | `sys.zeroize()` + `jitter.zeroize()` before scope exit |
+| Rust JNI `copy_jba` allocations (WG keys) | upstream BoringTun internally zeroizes when its types drop; we additionally cap DAITA inputs to prevent OOM-DoS |
+| `SecureBytes` general-purpose container | finalizer backstop + try-with-resources; constant-time equality (defeats timing side-channel on raw `Arrays.equals`) |
+
+What we **do not** defend against:
+
+* **GC relocation copies.** If the JVM moved a `ByteArray` mid-life,
+  the old slot is not wiped; a forensic snapshot of the heap can
+  recover it. Mitigation requires JVM-internal hooks we do not have.
+* **Page swap.** Android's swap files (`/dev/block/zram0` and post-13
+  the encrypted swap) may contain copies of wiped pages. The encrypted
+  swap means an attacker who pulls the disk gets cyphertext only;
+  cold-boot RAM attacks remain a theoretical concern.
+* **Compose recomposition copies.** A `String` held in `mutableStateOf`
+  is copied on every recomposition. Our OSINT card mitigates by
+  clearing state IMMEDIATELY after capture rather than waiting for
+  the network call to complete.
+
+---
+
+## 12. Network posture (TLS pinning + cleartext block)
+
+System-level enforcement in `res/xml/network_security_config.xml`:
+
+* `cleartextTrafficPermitted="false"` baseline. No plaintext HTTP
+  anywhere, even during debug. Code that attempts cleartext throws
+  `java.io.IOException: Cleartext HTTP traffic … not permitted`.
+* Per-domain SPKI-pin sets for `api.mullvad.net`,
+  `api.pwnedpasswords.com`, `haveibeenpwned.com`. Pin expiration is
+  one year out; re-capture is scheduled.
+* `<debug-overrides>` explicitly forbids user-installed CAs even in
+  debug builds. This blocks the "MITM proxy with my own root"
+  shortcut — which is also the exact shape of a hostile-environment
+  attacker dropping a CA onto a borrowed device.
+
+App-level enforcement in `dev.tetherand.app.net.PinnedHttp`:
+
+* OkHttp `CertificatePinner` with the same SPKI pin set.
+* `ConnectionSpec.RESTRICTED_TLS` restricted to TLS 1.3 (with 1.2
+  fallback for hosts that haven't migrated).
+* `followRedirects = false` / `followSslRedirects = false` — a 30x
+  to an unpinned host is rejected at the call site rather than
+  silently followed.
+
+Both layers must accept for a connection to succeed (belt and braces).
+A compromise of any single public CA alone cannot inject a substitute
+cert — the attacker also needs the matching pinned key.
+
+---
+
+## 13. App posture (manifest, IPC, exfil suppression)
+
+* **VPN control intent gate.** `TetherandActivity` is exported (it
+  must be for the `adb shell am ...` CLI flow), but
+  `onCreate()` now runs a runtime caller-identity check via
+  `Binder.getCallingUid()` and `Activity.getReferrer()`. Acceptable
+  callers: our own UID, `Process.SHELL_UID`, `Process.SYSTEM_UID`,
+  or a referrer URI matching the package, the shell, or systemui.
+  Everything else is `finishAndRemoveTask()`'d before the intent
+  extras are even parsed. Silent reject (we do not log the
+  rejected caller's identity — that would let an attacker probe
+  for our presence via logcat).
+* **noHistory / excludeFromRecents** on `TetherandActivity`. The
+  activity never lingers in the task stack as a re-launch vector.
+* **AoaAccessoryService** marked `exported="false"`. The
+  `USB_ACCESSORY_ATTACHED` broadcast is a system-privileged
+  broadcast — only the platform USB stack can fire it — and no
+  third-party caller has any legitimate reason to invoke this
+  service directly.
+* **`allowBackup="false"` + `fullBackupContent="false"` +
+  `dataExtractionRules`**. Captured selfies, voiceprints, threat-DB
+  rows, AI Guard model state, and every `EncryptedSharedPreferences`
+  blob stay on the device they were written to — they are NOT
+  migrated to a new phone by Google Backup or by the Smart Switch /
+  Quick Start handoff. Forensic artifact suppression: a migrated
+  device looks sealed to Tetherand.
+* **Log redaction.** No SHA-256 hashes in logcat (full hashes are
+  forensic artifacts that identify exact model-bytes the device
+  expected or received). No model-by-model state in logcat (would
+  tell an adversary which classifier is enabled). No intent extras.
+  No paths under `/data/` or `/Users/`. The rejection path of the
+  caller-identity check is **deliberately silent** to avoid
+  presence-probing.
+
+Permissions retained, all with documented justification:
+
+| Permission | Why we need it | Threat-model relevance |
+|---|---|---|
+| `INTERNET` | All relay paths | Required |
+| `ACCESS_NETWORK_STATE` | Chain switching on uplink change | Required |
+| `FOREGROUND_SERVICE*` | VPN + threat-detection + decoy + clipboard FGSs | Required |
+| `POST_NOTIFICATIONS` | FGS notification surface | Required |
+| `READ_PHONE_STATE` | M7a cell-tower / signal-strength reads | Used only for in-RAM heuristic; never logged |
+| `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` | M7a TAC-change heuristic | Used only for in-RAM heuristic; never persisted beyond current check |
+| `ACCESS_WIFI_STATE` + `CHANGE_WIFI_STATE` | M7a EvilTwin detection + chain switching | Used only for in-RAM heuristic + user-initiated chain switch |
+| `BLUETOOTH_SCAN` + `BLUETOOTH_CONNECT` | M7a BLE tracker heuristic + sniff-for-AirTags | Used only for in-RAM heuristic |
+| `QUERY_ALL_PACKAGES` | M7a PermissionDiff heuristic — watches for newly-installed surveillance apps | Necessary for the use case; the package-set is hashed for diff comparison only, never enumerated to disk |
+| `RECEIVE_BOOT_COMPLETED` | Start ThreatDetectionService on boot if user opted-in | Required |
+| `RECORD_AUDIO` | M9.x ultrasonic-beacon (18-22 kHz) | Hardened-Mode-only; FFT processed in-RAM; raw audio never written |
+| `CAMERA` | M9.x selfie-on-failed-unlock | Hardened-Mode + DeviceAdmin + user-opt-in; image captured to private `filesDir/selfies/` only, deletable by the user |
+
+No `WRITE_EXTERNAL_STORAGE`, no `SYSTEM_ALERT_WINDOW`, no
+`READ_CONTACTS`, no `READ_SMS`, no `READ_CALL_LOG`, no
+`PACKAGE_USAGE_STATS`, no `ACCESSIBILITY_SERVICE`. The
+permission set is the smallest one that lets the documented
+features function.
+
+---
+
+## 14. CVE coverage matrix (Android, last 90 days at v0.1 ship)
+
+| CVE | Affects | Status | Tetherand mitigation |
+|---|---|---|---|
+| **CVE-2026-21385** | Qualcomm graphics, actively exploited zero-day in March 2026 bulletin | Not exploitable from app sandbox (kernel-driver issue); A23 + Seeker users must apply OEM patch | We detect stale `Build.VERSION.SECURITY_PATCH` via `PatchLevelStaleness` heuristic and raise High / Critical alerts |
+| **CVE-2026-0073** | adbd RCE via TCP-mode adb | Detected by `AdbdNetworkSurface` heuristic (scans `service.adb.tcp.port` + `/proc/net/tcp{,6}` for port 5555 LISTEN). Plain USB ADB does not trigger. | User can suppress via `ThreatSuppressions` if adb-over-Wi-Fi is part of their dev workflow |
+| **CVE-2026-20449 / 20450** | MediaTek MT6878 modem stack | Affects baseband, not app sandbox | `MtkRogueCellDetector` surfaces cellular anomalies that may correlate |
+| MediaTek **KeyInstall** + **display** CVEs (March 2026 bulletin) | MediaTek closed-source kernel components | Patched by OEM rollups | `PatchLevelStaleness` >180d = High, >365d = Critical |
+| MediaTek Boot ROM vuln (Jan 2026) | Seeker SoC, requires physical access + EM fault-injection | NOT patchable in software (Boot ROM is mask-ROM); requires physical defense | Documented in §0 adversary model; mitigated by the SHAKE-256 entropy mixer (§10) which assumes the HW RNG may be biased |
+| **Solana Saga end-of-support** (May 2026) | The predecessor phone; not the Seeker | Saga users are at perpetual risk; Seeker remains supported | We document Saga-vs-Seeker in `docs/installing.html`; advise Saga users to migrate |
+| TLS-stripping by a compromised public CA | Network adversary | Defeated by SPKI pinning at both Android-system layer (`network_security_config.xml`) AND OkHttp-app layer (`PinnedHttp`) | §12 |
+| User-installed MITM root CA | Borrowed-device adversary | Defeated by `<debug-overrides>` excluding user CAs even in debug | §12 |
+| QUIC connection-migration deanonymization | Mass surveillance via stable QUIC connection IDs | Not directly mitigated — Tetherand inherits whatever Tor/Arti and Mullvad protocols choose | Future: M11.x bridge-rotation timer |
+
+---
+
+## 15. Boot-integrity check (Verified-Boot + KeyStore attestation)
+
+`dev.tetherand.app.crypto.BootIntegrity` runs at every cold-start of
+`MainActivity` and produces one of six verdicts:
+
+| Verdict | Meaning | Accept? |
+|---|---|---|
+| `Verified` | `vbs=green` (OEM-locked) + release-keys + non-empty attestation chain | **Yes** |
+| `VerifiedUserRoot` | `vbs=yellow` (user-locked AVB, canonically GrapheneOS) + release-keys + non-empty attestation chain | **Yes** — security-equivalent to Verified |
+| `UnlockedBootloader` | `vbs=orange` or `ro.boot.flash.locked=0` | No |
+| `Failed` | `vbs=red` (verified-boot failure) | No |
+| `Untrusted` | test-keys / debuggable / empty attestation chain | No |
+| `Unknown` | could not read any signal | No |
+
+**GrapheneOS posture (explicit).** GrapheneOS users re-lock the
+bootloader with their own AVB signing key, which makes
+`ro.boot.verifiedbootstate` return `yellow`. The bootloader is still
+locked; the verified-boot chain still validates; the user has chosen
+their trust root deliberately. Treating `yellow` as untrusted would
+deliberately weaken our security posture by pushing the most
+privacy-paranoid users (exactly Tetherand's target audience) toward
+less-hardened distributions. We therefore accept `yellow` as
+`VerifiedUserRoot`, which is functionally equivalent to `Verified`.
+
+Signals consulted, in increasing strength:
+
+1. `ro.boot.verifiedbootstate` — green / yellow accepted, orange / red rejected.
+2. `ro.boot.flash.locked` — must be `1`.
+3. `Build.TAGS` — must contain `release-keys` (not `test-keys` or `dev-keys`).
+4. `Build.IS_DEBUGGABLE` — must be `false` in release.
+5. KeyStore attestation chain length — must be > 0. A non-zero chain
+   proves the device's TEE / StrongBox key is signed by *some*
+   attestation authority. Full root-pubkey pin validation (against
+   the published Google root and known GrapheneOS roots) is the
+   v0.2 deliverable; v0.1 ships the length check.
+
+On the emulator, `vbs=orange` because the AVD bootloader is always
+unlocked. The check returns `UnlockedBootloader` but the app
+continues to function — release builds fail closed; debug builds
+display the warning and let development proceed.
 
 ---
 

@@ -44,4 +44,23 @@ object ModelBundle {
     )
 
     val ALL: List<Model> = listOf(PHI_TETHERAND, VOICEGUARD, TEXTGUARD, QRGUARD)
+
+    /**
+     * Look up the in-code pin for a model id, if one exists.
+     *
+     * `ModelUpdater` consults this BEFORE accepting a downloaded
+     * model bundle — even if the (quadruple-signed) manifest's
+     * `sha256` field matches the downloaded bytes, the in-code pin
+     * must ALSO match if it is not the sentinel "TBD-cosign-pinned".
+     * This defends against the case where the signing keys are
+     * compromised: a hostile signer can re-issue the EXISTING
+     * model bytes under a valid signature (no value to them), but
+     * cannot substitute hostile classifier bytes — the in-code
+     * pin won't match.
+     *
+     * Once a real model is bundled, replace `TBD-cosign-pinned`
+     * here with the actual file SHA-256 (lower-case hex).
+     */
+    fun pinFor(id: String): String? =
+        ALL.firstOrNull { it.id == id }?.sha256Hex?.takeIf { it != "TBD-cosign-pinned" }
 }

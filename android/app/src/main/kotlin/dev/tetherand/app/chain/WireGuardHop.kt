@@ -231,6 +231,11 @@ class WireGuardHop(
         output = null
         if (handle != 0L) { nativeFree(handle); handle = 0 }
         if (daitaHandle != 0L) { nativeDaitaFree(daitaHandle); daitaHandle = 0 }
+        // Wipe Kotlin-side key material now that the JNI WG instance
+        // (which held its own copies in Rust) has been freed. The Rust
+        // side wipes its copies via the zeroize crate; this finishes
+        // the job on the JVM heap.
+        try { config.zeroize() } catch (_: Throwable) {}
         scope.cancel()
         _state.value = HopState.Idle
     }

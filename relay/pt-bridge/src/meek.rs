@@ -11,8 +11,8 @@
 //   front=  optional Host header for domain-fronting
 //   utls=  optional uTLS fingerprint (we use rustls; documented gap)
 
+use crate::secure_rng;
 use crate::socks5::Target;
-use rand::RngCore;
 use rustls::pki_types::ServerName;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -32,9 +32,14 @@ pub async fn dial(target: Target, args: HashMap<String, String>, mut arti_sock: 
     let path = if url.path().is_empty() { "/".to_string() } else { url.path().to_string() };
     let target_host = front_host.clone().unwrap_or_else(|| host.clone());
 
-    // Generate session id.
+    // Generate session id from SHAKE-256-mixed entropy. We do NOT use
+    // rand::thread_rng() here — a session ID that an adversary can
+    // predict (because they've biased the thread-local PRNG state via
+    // a degraded /dev/urandom early-boot window) leaks per-connection
+    // identity across requests. The SHAKE mixer over four independent
+    // sources defeats this.
     let mut sid_bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut sid_bytes);
+    secure_rng::fill(&mut sid_bytes);
     let session_id = sid_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>();
 
     // TLS connect to the bridge.

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Belt-and-braces on top of android:allowBackup="false" /
+    android:fullBackupContent="false". This rules file says:
+    DO NOT include any data in cloud backups, and DO NOT include
+    any data in device-to-device transfers either. Captured selfies,
+    voiceprints, threat-db rows, AI Guard model state, and every
+    EncryptedSharedPreferences blob stay on the device they were
+    written to — they are NOT migrated to a new phone by Google Backup
+    or by the Smart Switch / Quick Start handoff flow.
+
+    Reasoning: forensic artifact suppression. A migrated device is
+    indistinguishable to Tetherand from a sealed device, so an
+    adversary with physical access to a successor handset cannot
+    recover the predecessor's threat history.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root"           path="."/>
+        <exclude domain="file"           path="."/>
+        <exclude domain="database"       path="."/>
+        <exclude domain="sharedpref"     path="."/>
+        <exclude domain="external"       path="."/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root"           path="."/>
+        <exclude domain="file"           path="."/>
+        <exclude domain="database"       path="."/>
+        <exclude domain="sharedpref"     path="."/>
+        <exclude domain="external"       path="."/>
+    </device-transfer>
+</data-extraction-rules>

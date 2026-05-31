@@ -10,6 +10,7 @@
 // cross-compiled Go upstream binaries (see scripts/build-pts-android.sh).
 
 mod pt_protocol;
+mod secure_rng;
 mod socks5;
 mod obfs4;
 mod meek;

@@ -164,7 +164,22 @@ class ModelUpdater(private val ctx: Context) {
                 val bytes = httpGet(url)
                 val actualHex = sha256Hex(bytes)
                 if (!actualHex.equals(expectedHex, ignoreCase = true)) {
-                    Log.w(TAG, "$id sha256 mismatch: expected=$expectedHex actual=$actualHex")
+                    // Redact: log only the first 8 hex chars of each
+                    // side. A full hash is itself a forensic artifact
+                    // (it identifies precisely which model bytes were
+                    // expected and which arrived — useful for an
+                    // attacker correlating download attempts).
+                    Log.w(TAG, "$id sha256 mismatch (manifest claim): expected=${expectedHex.take(8)}… actual=${actualHex.take(8)}…")
+                    continue
+                }
+                // Second-layer pin: the in-code ModelBundle.pinFor()
+                // pin must also match if it is not the TBD sentinel.
+                // This is the "compromised-signer" defense — a hostile
+                // signer with all four manifest keys can re-issue the
+                // existing models but cannot swap in hostile bytes.
+                val codePin = ModelBundle.pinFor(id)
+                if (codePin != null && !actualHex.equals(codePin, ignoreCase = true)) {
+                    Log.w(TAG, "$id sha256 mismatch (in-code pin): expected=${codePin.take(8)}… actual=${actualHex.take(8)}…")
                     continue
                 }
                 val f = File(outDir, "$id.tflite")
