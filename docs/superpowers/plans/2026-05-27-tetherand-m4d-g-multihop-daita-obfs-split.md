@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close M4 by shipping the four remaining Mullvad-feature surfaces — multihop, DAITA, obfuscation transports (udp2tcp + Shadowsocks + QUIC), and per-app split-tunnel. Together they finish parity with Mullvad's official app and ship the full DEFCON-grade privacy stack on the chain side.
+**Goal:** Close M4 by shipping the four remaining Mullvad-feature surfaces — multihop, DAITA, obfuscation transports (udp2tcp + Shadowsocks + QUIC), and per-app split-tunnel. Together they finish parity with Mullvad's official app and ship the full 5364C13D-grade privacy stack on the chain side.
 
 **Architecture:**
 - **M4d Multihop**: extend `MullvadConfigBuilder` to accept an `(entry, exit)` server pair. The client's WG endpoint becomes `entry.ipv4 : exit.multihopPort` — Mullvad's entry server forwards traffic to the exit on that special port. Same WG keys, same client config, just a different endpoint.

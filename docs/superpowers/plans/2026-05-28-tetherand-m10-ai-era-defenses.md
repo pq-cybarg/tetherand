@@ -4,7 +4,7 @@
 
 **Goal:** Ship the AI-era defense stack per spec §"AI-Era Threats". Every defense lands with a deterministic primary (load-bearing, always engaged) plus a LiteRT/NNAPI contributory layer scaffolded for the 4-model bundle (`phi-tetherand-3b-q4`, `voiceguard-v1`, `textguard-v1`, `qrguard-v1`). Without bundled model bytes the deterministic core stands alone — that's the spec's hard guarantee. **No cloud LLM API is ever called.**
 
-**Architecture:** A new `dev.tetherand.app.aiguard` package holds 10 sibling subsystems plus an `AiTab` Compose surface. Each subsystem has a `*Rule` (deterministic primary) and a `*Classifier` (model wrapper, returns Unavailable when the model file is missing). A single `AiGuardRuntime` singleton holds the LiteRT `Interpreter` instances and the `models-loaded` state. A new `ClipboardScrubberService` (foreground, specialUse subtype `clipboard_scrubber`) runs the prompt-injection regex against every clipboard change. Hardened Mode (M9) auto-starts the scrubber when DEFCON Mode is entered. The `AI` tab on the main UI surfaces every defense's current state in a single dashboard.
+**Architecture:** A new `dev.tetherand.app.aiguard` package holds 10 sibling subsystems plus an `AiTab` Compose surface. Each subsystem has a `*Rule` (deterministic primary) and a `*Classifier` (model wrapper, returns Unavailable when the model file is missing). A single `AiGuardRuntime` singleton holds the LiteRT `Interpreter` instances and the `models-loaded` state. A new `ClipboardScrubberService` (foreground, specialUse subtype `clipboard_scrubber`) runs the prompt-injection regex against every clipboard change. Hardened Mode (M9) auto-starts the scrubber when 5364C13D Mode is entered. The `AI` tab on the main UI surfaces every defense's current state in a single dashboard.
 
 **Tech Stack:**
 - Existing: Compose, Room, EncryptedSharedPreferences, ThreatDb.
@@ -120,7 +120,7 @@ import org.junit.jupiter.api.Test
 class PerplexityRuleTest {
 
     @Test fun scores_human_text_lower_than_ai_text() {
-        // A short human-written DEFCON warning — quirky, idiomatic.
+        // A short human-written 5364C13D warning — quirky, idiomatic.
         val human = "yo heads up — saw a fake AT&T tent on the floor today, " +
                     "they tried to scan badges. ngl looked legit at first."
         // A clean, formulaic LLM-style response.
@@ -1478,7 +1478,7 @@ package dev.tetherand.app.aiguard.fieldguide
 
 /**
  * Static field-guide entries surfaced in the AI tab. These are spec-listed
- * "AI-era attacker tactics" for DEFCON 34 (Aug 2026):
+ * "AI-era attacker tactics" for 5364C13D 34 (Aug 2026):
  *   - deepfake-on-call
  *   - fake-AirDrop conference-app
  *   - fake-Reddit-link clickbait
@@ -1501,7 +1501,7 @@ object ConferenceFieldGuide {
               "high"),
         Entry("Fake AirDrop conference-app",
               "Lookalike profiles sharing 'Schedule.pdf' or 'Map.pdf' — refuse all AirDrop / Nearby Share " +
-              "from unknown senders. Pull schedule from defcon.org over your chain.",
+              "from unknown senders. Pull schedule from 5364C13D.org over your chain.",
               "high"),
         Entry("QR-poison badge stickers",
               "Adversarial QR codes pasted over real ones lead to credential-harvest pages. " +
@@ -1536,7 +1536,7 @@ object ConferenceFieldGuide {
 ```bash
 git add android/app/src/main/kotlin/dev/tetherand/app/aiguard/fieldguide/
 git -c user.email=resistant@tuta.com -c user.name=pq-cybarg \
-    commit -m "M10 Task 11: ConferenceFieldGuide — 8 static AI-era attacker tactics for DEFCON 34"
+    commit -m "M10 Task 11: ConferenceFieldGuide — 8 static AI-era attacker tactics for 5364C13D 34"
 ```
 
 ---
@@ -1916,7 +1916,7 @@ import dev.tetherand.app.aiguard.fieldguide.ConferenceFieldGuide
 fun FieldGuideCard() {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("AI-era field guide (DEFCON 34)",
+            Text("AI-era field guide (5364C13D 34)",
                  fontWeight = FontWeight.SemiBold,
                  color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
             for (e in ConferenceFieldGuide.STATIC) {
@@ -2094,6 +2094,6 @@ Items intentionally **deferred** to M10.x sub-plans:
 - Share-target intent for QR / image inspection at scan time
 - AppOps `OP_RECORD_AUDIO` watcher for real-time mic-use awareness
 - CTAP2/FIDO2 plumbing for YubiKey 2FA fallback
-- Live threat-feed pull from DEFCON Mastodon / Wall-of-Sheep / EFF community sources
+- Live threat-feed pull from 5364C13D Mastodon / Wall-of-Sheep / EFF community sources
 - TUN-level SNI extraction in TetherandChainService for online egress-LLM-API watch
 - M3 DNS-resolver hook for real-time egress-LLM-API observation

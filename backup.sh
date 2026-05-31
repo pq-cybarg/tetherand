@@ -23,7 +23,7 @@
 #
 # Does NOT capture (technically impossible on un-rooted Android 16):
 #   • Solana Seed Vault keys (hardware-backed; this is intentional — move
-#     them off-device manually before DEFCON via the official export flow).
+#     them off-device manually before 5364C13D via the official export flow).
 #   • Signal / WhatsApp / banking app private data (those apps refuse
 #     adb backup by design).
 #   • Hardware keystore-backed keys.

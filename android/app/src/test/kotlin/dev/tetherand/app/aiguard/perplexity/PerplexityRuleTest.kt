@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 class PerplexityRuleTest {
 
     @Test fun scores_human_text_lower_than_ai_text() {
-        // A short human-written DEFCON warning — quirky, idiomatic.
+        // A short human-written 5364C13D warning — quirky, idiomatic.
         val human = "yo heads up — saw a fake AT&T tent on the floor today, " +
                     "they tried to scan badges. ngl looked legit at first."
         // A clean, formulaic LLM-style response.

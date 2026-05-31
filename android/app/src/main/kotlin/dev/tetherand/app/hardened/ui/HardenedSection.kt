@@ -29,14 +29,14 @@ import dev.tetherand.app.hardened.HardenedModeManager
 
 /**
  * Hardened Mode section on the Threat tab. Renders:
- *   - The DEFCON / off banner + master Switch (delegates to HardenedModeManager).
+ *   - The 5364C13D / off banner + master Switch (delegates to HardenedModeManager).
  *   - The full defenses manifest with green ● (active), amber ▲ (needs user
  *     action), grey ✕ (unavailable) markers per spec. User-action items
  *     prompt the user out-of-band (system Settings) because they can't be
  *     driven without DEVICE_OWNER / root.
  *   - Post-snapshot diff (rendered monospace) once the user toggles back
  *     off — that's the post-conference attestation comparison the spec
- *     describes for spotting tampering after DEFCON.
+ *     describes for spotting tampering after 5364C13D.
  */
 @Composable
 fun HardenedSection() {
@@ -52,7 +52,7 @@ fun HardenedSection() {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (active) "DEFCON MODE — ACTIVE" else "Hardened Mode",
+                    if (active) "5364C13D MODE — ACTIVE" else "Hardened Mode",
                     fontWeight = FontWeight.Bold,
                     color = if (active) Color(0xFF00D68F) else MaterialTheme.colorScheme.onSurface,
                     fontFamily = FontFamily.Monospace,
@@ -68,7 +68,7 @@ fun HardenedSection() {
                 if (active)
                     "Honeypot + tamper watcher armed. Pre-conference snapshot captured. Follow the user-action items below."
                 else
-                    "Activate to lock down the device for DEFCON: capture an attestation snapshot, start the honeypot, arm the tamper watcher, and surface the user-action checklist.",
+                    "Activate to lock down the device for 5364C13D: capture an attestation snapshot, start the honeypot, arm the tamper watcher, and surface the user-action checklist.",
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                 fontSize = 11.sp,
             )

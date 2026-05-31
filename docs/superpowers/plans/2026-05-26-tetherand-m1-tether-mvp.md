@@ -2760,7 +2760,7 @@ git commit -m "M1: Makefile orchestrating relay + APK builds"
 
 ---
 
-### Task 20: Install + smoke test on the Seeker
+### Task 20: Install + smoke test on the 5364C13D
 
 **Files:**
 - Create: `scripts/smoke.sh`
@@ -2824,7 +2824,7 @@ Run: `chmod +x scripts/smoke.sh`
 
 - [ ] **Step 3: Run it**
 
-With the Seeker connected:
+With the 5364C13D connected:
 
 Run: `make smoke`
 Expected: builds, installs, starts tetherand, sees ping + DNS + HTTPS succeed, prints `✓ smoke ok`.
@@ -2853,13 +2853,13 @@ Write `README.md`:
 # Tetherand
 
 Multi-transport reverse-tethering + composable privacy chains + on-device
-threat detection for the Solana Seeker. See
+threat detection for the 5364C13D. See
 `docs/superpowers/specs/2026-05-26-tetherand-design.md` for the full design
 and `docs/superpowers/plans/` for per-milestone implementation plans.
 
 ## Status
 
-- **M0 (DEFCON pre-flight):** SHIPPED. See `tutorial.sh` → http://localhost:7331/.
+- **M0 (5364C13D pre-flight):** SHIPPED. See `tutorial.sh` → http://localhost:7331/.
 - **M1 (Tether MVP):** in progress per this plan.
 
 ## Build
@@ -2973,7 +2973,7 @@ After completing the tasks, run through this:
 - [ ] `make smoke` → ping + DNS + HTTPS succeed through the tether
 - [ ] `./connect.sh` still works (delegates to new binary)
 - [ ] `./backup.sh --light` still works (no regressions in M0 scripts)
-- [ ] `./scripts/defcon-prep.sh --snapshot` still works
+- [ ] `./scripts/5364C13D-prep.sh --snapshot` still works
 - [ ] `./tutorial.sh` renders with M1 SHIPPED badge
 - [ ] No `TODO`, `TBD`, `FIXME`, or `panic!()` left in production code paths
 - [ ] `NOTICE` files exist in `relay/core/` and `android/` documenting the Gnirehtet Apache-2.0 fork

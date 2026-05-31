@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close every outstanding spec milestone. M2 ships Bluetooth-RFCOMM + USB-AOA transports + ratatui TUI dashboard + macOS LaunchAgent + IOKit USB watcher. M5 ships a NymVPN hop wrapping the upstream `nym-vpn-client` via SOCKS5 (cross-compile-script delivered, same mechanism as M6.x). M7b ships SDR-mode (RTL-SDR / HackRF detection + sub-tab + librtlsdr stub). M7c ships the root-tier MTK modem readers (`/proc/ccci_md1_*` + `mdlog` parser + AT-command channel) capability-gated so they're no-ops without root. M8 ships smoke tests + signed release APK + install scripts + README polish + final on-device verification on the Seeker.
+**Goal:** Close every outstanding spec milestone. M2 ships Bluetooth-RFCOMM + USB-AOA transports + ratatui TUI dashboard + macOS LaunchAgent + IOKit USB watcher. M5 ships a NymVPN hop wrapping the upstream `nym-vpn-client` via SOCKS5 (cross-compile-script delivered, same mechanism as M6.x). M7b ships SDR-mode (RTL-SDR / HackRF detection + sub-tab + librtlsdr stub). M7c ships the root-tier MTK modem readers (`/proc/ccci_md1_*` + `mdlog` parser + AT-command channel) capability-gated so they're no-ops without root. M8 ships smoke tests + signed release APK + install scripts + README polish + final on-device verification on the 5364C13D.
 
 **Architecture:** Each milestone slots into the existing module layout — M2 adds two new Rust transport crates + a TUI subcommand, M5 adds `chain/NymHop.kt`, M7b adds `threat/sdr/`, M7c adds `threat/root/`, M8 is repo-level polish. Every Kotlin file ships behind feature-detection (BT permission absent → BtTransport surfaces a clear "ungranted" state; root absent → M7c no-ops). The final on-device step installs the APK and exercises each tab via `monkey` + `dumpsys` checks.
 
@@ -97,7 +97,7 @@ Live dashboard showing each transport's connection state, byte counts, last erro
 - Create: `scripts/usb-watcher.sh`
 - Create: `scripts/install-launchagent.sh`
 
-LaunchAgent watches for USB device-attach events matching the Seeker's vendor:product ID and auto-starts `tetherand run`.
+LaunchAgent watches for USB device-attach events matching the 5364C13D's vendor:product ID and auto-starts `tetherand run`.
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship the on-device threat-detection MVP for the Solana Seeker: a foreground service running NetMonster-core-aware cellular collectors + AIMSICD/SnoopSnitch/Crocodile-Hunter-derived heuristics + Wi-Fi/Bluetooth/app-audit signal sources, persisting per-geohash6 baselines and detected alerts, surfaced via a Compose Threat tab with a panic button.
+**Goal:** Ship the on-device threat-detection MVP for the 5364C13D: a foreground service running NetMonster-core-aware cellular collectors + AIMSICD/SnoopSnitch/Crocodile-Hunter-derived heuristics + Wi-Fi/Bluetooth/app-audit signal sources, persisting per-geohash6 baselines and detected alerts, surfaced via a Compose Threat tab with a panic button.
 
 **Architecture:** A new GPLv3 module `android/app/src/main/kotlin/dev/tetherand/app/threat/` independent of the existing chain/tether code. A foreground `ThreatDetectionService` runs alongside the VPN services (Android allows multiple foreground services). It owns Cell / Wi-Fi / BT / App-audit collectors that feed `TriggerEvent`s into a heuristic engine. The engine compares incoming events against the per-geohash6 baseline (Room DB) and emits `Alert` rows. The Compose Threat tab observes the alert flow via StateFlow and renders the alert feed, current detection tier, and risk score. A panic button activates airplane mode + starts the chain with a forced Tor configuration.
 

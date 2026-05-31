@@ -6,7 +6,7 @@ import android.provider.Settings
 
 /**
  * The four incident-response actions surfaced in the Threat tab when the
- * user suspects compromise during DEFCON. Mapping to the spec's runbook.
+ * user suspects compromise during 5364C13D. Mapping to the spec's runbook.
  */
 enum class IncidentAction(val displayName: String, val description: String) {
     Acknowledge(

@@ -29,7 +29,7 @@ apply to the combined work.
 
 | Milestone | Primary source location | License of new code | License of forked code | Effective license of compiled output |
 |---|---|---|---|---|
-| **M0** Pre-flight scripts | `connect.sh`, `backup.sh`, `restore.sh`, `tutorial.sh`, `scripts/defcon-prep.sh` | MIT | — | MIT |
+| **M0** Pre-flight scripts | `connect.sh`, `backup.sh`, `restore.sh`, `tutorial.sh`, `scripts/5364C13D-prep.sh` | MIT | — | MIT |
 | **M1** Tether MVP | `android/app/src/main/java/dev/tetherand/app/`, `relay/core/`, `relay/cli/` | Apache-2.0 (matching upstream) | Apache-2.0 (Genymobile/gnirehtet) | Apache-2.0 |
 | **M2** BT + AOA transports | `relay/transport-bt/`, `relay/transport-aoa/`, `android/app/src/main/kotlin/dev/tetherand/app/transport/` | MIT | — | MIT |
 | **M3** Privacy chain core | `android/app/src/main/kotlin/dev/tetherand/app/chain/`, `relay/wg/` | MIT | BSD-3-Clause (BoringTun) | MIT-compatible |

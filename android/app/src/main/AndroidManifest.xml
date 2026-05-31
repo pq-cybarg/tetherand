@@ -160,13 +160,13 @@
                 android:value="clipboard_scrubber"/>
         </service>
 
-        <!-- M9: Hardened Mode Quick Settings tile ("DEFCON Mode"). One-tap
+        <!-- M9: Hardened Mode Quick Settings tile ("5364C13D Mode"). One-tap
              entry/exit. Must be exported with BIND_QUICK_SETTINGS_TILE so
              the system SystemUI process can bind to it. -->
         <service
             android:name=".hardened.tile.HardenedTileService"
             android:icon="@drawable/ic_report_problem_24dp"
-            android:label="DEFCON Mode"
+            android:label="5364C13D Mode"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">
             <intent-filter>

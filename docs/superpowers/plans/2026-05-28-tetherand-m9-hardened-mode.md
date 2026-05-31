@@ -1,8 +1,8 @@
-# Tetherand M9 — Hardened Mode (DEFCON Profile) Implementation Plan
+# Tetherand M9 — Hardened Mode (5364C13D Profile) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship the one-tap **Hardened Mode** DEFCON profile in the app. Activation locks down the device's posture across network / app-audit / sensor / Bluetooth / NFC / honeypot / physical-tamper axes simultaneously, takes a pre-conference attestation snapshot for later post-diff, freezes the app-audit baseline against which threat detection alerts on drift, lights up a Quick Settings tile, surfaces the incident-response runbook with four actions, and stays toggle-reversible.
+**Goal:** Ship the one-tap **Hardened Mode** 5364C13D profile in the app. Activation locks down the device's posture across network / app-audit / sensor / Bluetooth / NFC / honeypot / physical-tamper axes simultaneously, takes a pre-conference attestation snapshot for later post-diff, freezes the app-audit baseline against which threat detection alerts on drift, lights up a Quick Settings tile, surfaces the incident-response runbook with four actions, and stays toggle-reversible.
 
 **Architecture:** A new `HardenedModeManager` is the single state machine. On enter, it (1) writes a pre-snapshot to `EncryptedSharedPreferences`, (2) freezes the M7a app-audit baseline, (3) starts a `DecoyListenerService` honeypot on a handful of unprivileged ports, (4) registers an accelerometer-tamper watcher, (5) records system settings it can modify, and (6) emits user-driven action prompts for things the app can't programmatically toggle (NFC off, SIM-PIN, system always-on-VPN). On exit, it captures a post-snapshot and surfaces the diff via the Threat tab. A new `HardenedTileService` (Quick Settings) and a new section on the Threat tab give the user the entry points. The incident-response runbook is a single Compose `Card` with four buttons (Acknowledge / Isolate / Evacuate / Burn) wired to deterministic actions.
 
@@ -13,7 +13,7 @@
 
 **License:** This module reuses the M7a threat-module GPLv3 surface; the new code stays GPLv3 to match.
 
-**Scope:** This plan ships the high-value DEFCON Hardened Mode subset. Items the spec lists that are NOT in this plan and are explicitly out-of-scope (require root, deep TLS inspection, ultrasonic mic FFT, Camera2 selfie-on-failed-unlock, dead-man's switch with remote wipe, decoy profile) are deferred to M9.x follow-up plans. Each deferred item is documented at the end of the self-review.
+**Scope:** This plan ships the high-value 5364C13D Hardened Mode subset. Items the spec lists that are NOT in this plan and are explicitly out-of-scope (require root, deep TLS inspection, ultrasonic mic FFT, Camera2 selfie-on-failed-unlock, dead-man's switch with remote wipe, decoy profile) are deferred to M9.x follow-up plans. Each deferred item is documented at the end of the self-review.
 
 ---
 
@@ -126,7 +126,7 @@ import org.json.JSONObject
 /**
  * Pre/Post-conference attestation snapshot. Captures the device fingerprint
  * + package signatures + system settings + threat-baseline at toggle time
- * so the user can diff and spot tampering after DEFCON.
+ * so the user can diff and spot tampering after 5364C13D.
  *
  * Spec mapping: maps directly to the spec's "Pre / Post Conference
  * Attestation" table. Hardware-attestation (KeyAttestation) is in here
@@ -641,7 +641,7 @@ import android.provider.Settings
 
 /**
  * The four incident-response actions surfaced in the Threat tab when the
- * user suspects compromise during DEFCON.
+ * user suspects compromise during 5364C13D.
  */
 enum class IncidentAction(val displayName: String, val description: String) {
     Acknowledge(
@@ -750,11 +750,11 @@ class HardenedTileService : TileService() {
         val tile = qsTile ?: return
         if (manager.active.value) {
             tile.state = Tile.STATE_ACTIVE
-            tile.label = "DEFCON Mode"
+            tile.label = "5364C13D Mode"
             tile.contentDescription = "Hardened Mode is ON"
         } else {
             tile.state = Tile.STATE_INACTIVE
-            tile.label = "DEFCON Mode"
+            tile.label = "5364C13D Mode"
             tile.contentDescription = "Hardened Mode is OFF"
         }
         tile.updateTile()
@@ -770,7 +770,7 @@ In `AndroidManifest.xml`, inside `<application>`:
         <service
             android:name=".hardened.tile.HardenedTileService"
             android:icon="@drawable/ic_report_problem_24dp"
-            android:label="DEFCON Mode"
+            android:label="5364C13D Mode"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">
             <intent-filter>
@@ -785,7 +785,7 @@ In `AndroidManifest.xml`, inside `<application>`:
 cd android && ./gradlew :app:assembleDebug
 git add android/app/src/main/kotlin/dev/tetherand/app/hardened/tile/HardenedTileService.kt \
         android/app/src/main/AndroidManifest.xml
-git commit -m "M9 Task 7: HardenedTileService — Quick Settings tile for one-tap DEFCON Mode"
+git commit -m "M9 Task 7: HardenedTileService — Quick Settings tile for one-tap 5364C13D Mode"
 ```
 
 ---
@@ -830,7 +830,7 @@ fun HardenedSection() {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (active) "DEFCON MODE — ACTIVE" else "Hardened Mode",
+                    if (active) "5364C13D MODE — ACTIVE" else "Hardened Mode",
                     fontWeight = FontWeight.Bold,
                     color = if (active) Color(0xFF00D68F) else MaterialTheme.colorScheme.onSurface,
                     fontFamily = FontFamily.Monospace,
@@ -846,7 +846,7 @@ fun HardenedSection() {
                 if (active)
                     "Honeypot + tamper watcher armed. Pre-conference snapshot captured. Follow the user-action items below."
                 else
-                    "Activate to lock down the device for DEFCON: capture an attestation snapshot, start the honeypot, arm the tamper watcher, and surface the user-action checklist.",
+                    "Activate to lock down the device for 5364C13D: capture an attestation snapshot, start the honeypot, arm the tamper watcher, and surface the user-action checklist.",
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                 fontSize = 11.sp,
             )
@@ -1004,7 +1004,7 @@ ls -lh bin/tetherand.apk
 In `README.md`, after the M7a line:
 
 ```markdown
-- **M9** (Hardened Mode — one-tap DEFCON profile: honeypot + tamper-watch + attestation snapshot + frozen baseline + incident-response runbook + Quick Settings tile): **shipped**.
+- **M9** (Hardened Mode — one-tap 5364C13D profile: honeypot + tamper-watch + attestation snapshot + frozen baseline + incident-response runbook + Quick Settings tile): **shipped**.
 ```
 
 In `tutorial.sh`, find the M9 row and flip its badge to `<span class="badge ok">SHIPPED</span>`. Flip M10's badge to `<span class="badge warn">NEXT</span>`.
@@ -1027,7 +1027,7 @@ git commit -m "M9 Task 9: M9 SHIPPED — Hardened Mode, honeypot, tamper-watch, 
 - [ ] An incoming connection to one of the decoy ports fires an alert in the alert feed.
 - [ ] Picking the phone up after 5+ minutes of stillness while Hardened Mode is on fires a Critical alert.
 - [ ] Toggling off captures a post-snapshot; the diff appears in the Hardened section.
-- [ ] Quick Settings tile "DEFCON Mode" appears in the system tile editor and toggles Hardened Mode on tap.
+- [ ] Quick Settings tile "5364C13D Mode" appears in the system tile editor and toggles Hardened Mode on tap.
 
 Spec coverage:
 

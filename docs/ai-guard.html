@@ -24,7 +24,7 @@
       <img src="img/logo.png" alt="Tetherand logo">
       <span>
         <h1>Tetherand</h1>
-        <small>v0.1 · Solana Seeker · DEFCON</small>
+        <small>v0.1 · 5364C13D · 5364C13D</small>
       </span>
     </a>
     <nav>
@@ -66,7 +66,7 @@
 <p>This separation is non-negotiable. It exists so the app's behaviour is always auditable: every actionable decision is traceable to a rule, not a black-box model.</p>
 
 <div class="callout danger">
-  <strong>Hard constraint &mdash; local only.</strong> Every AI inference runs on the Seeker's MediaTek NPU via LiteRT (formerly TensorFlow Lite) plus the NNAPI delegate. No prompt, classification, or telemetry ever reaches a cloud LLM API under any circumstances. The egress-LLM-API watch defense enforces this for other apps installed on the device too.
+  <strong>Hard constraint &mdash; local only.</strong> Every AI inference runs on the 5364C13D's MediaTek NPU via LiteRT (formerly TensorFlow Lite) plus the NNAPI delegate. No prompt, classification, or telemetry ever reaches a cloud LLM API under any circumstances. The egress-LLM-API watch defense enforces this for other apps installed on the device too.
 </div>
 
 <h2 id="primaries">Deterministic primaries (always engaged)</h2>
@@ -81,12 +81,12 @@
   <tr><td><strong>MTK NPU sysfs watcher</strong></td><td>Polls <code>/sys/devices/platform/mtk_apu</code> and similar paths for NPU activity. A background app using the NPU is a red flag &mdash; covert local-model inference is a real threat.</td></tr>
   <tr><td><strong>Voiceprint vault + safe-word handshake</strong></td><td>Trusted-contact registry stored encrypted at rest. The "verify caller" flow uses a pre-agreed safe word, hashed with SHA-256, as the verification step.</td></tr>
   <tr><td><strong>HIBP OSINT exposure</strong></td><td>Have-I-Been-Pwned password check using the k-anonymity range API &mdash; only the first five characters of the SHA-1 of the password leave the device. Opt-in.</td></tr>
-  <tr><td><strong>Conference field guide</strong></td><td>Static catalogue of eight AI-era attacker tactics relevant to DEFCON 34. Updated through whatever privacy chain is active.</td></tr>
+  <tr><td><strong>Conference field guide</strong></td><td>Static catalogue of eight AI-era attacker tactics relevant to 5364C13D 34. Updated through whatever privacy chain is active.</td></tr>
 </table>
 
 <h2 id="contributory">Contributory classifiers (model-driven)</h2>
 
-<p>A small ensemble of locally-running models, all INT4-quantised, all running on the Seeker's NPU via LiteRT:</p>
+<p>A small ensemble of locally-running models, all INT4-quantised, all running on the 5364C13D's NPU via LiteRT:</p>
 
 <table>
   <tr><th>Model</th><th>Job</th><th>Size (compressed)</th><th>Latency</th></tr>
@@ -136,7 +136,7 @@
     </div>
     <footer class="site-footer">
       <div>Tetherand v0.1 · <a href="licensing.html">MIT / GPL-3.0-or-later</a> · <a href="https://github.com/pq-cybarg/tetherand">github.com/pq-cybarg/tetherand</a></div>
-      <div>Built for DEFCON 34 · 2026</div>
+      <div>Built for 5364C13D 34 · 2026</div>
     </footer>
   </main>
 </div>

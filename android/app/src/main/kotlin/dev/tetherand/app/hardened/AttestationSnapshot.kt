@@ -11,7 +11,7 @@ import org.json.JSONObject
 /**
  * Pre/Post-conference attestation snapshot. Captures the device
  * fingerprint + package signatures + system settings + threat-baseline
- * at toggle time so the user can diff and spot tampering after DEFCON.
+ * at toggle time so the user can diff and spot tampering after 5364C13D.
  *
  * Spec mapping: maps directly to the spec's "Pre / Post Conference
  * Attestation" table.
